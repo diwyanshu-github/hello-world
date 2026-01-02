@@ -1427,6 +1427,50 @@ int floorBST(TreeNode *root, int key)
 // Time  : O(h)
 // Space : O(1)
 
+// ! validate bst
+bool isValidBST(TreeNode *root)
+{
+    TreeNode *curr = root;
+    TreeNode *prev = nullptr;
+    bool res = true;
+    while (curr)
+    {
+        if (curr->left)
+        {
+            TreeNode *pre = curr->left;
+            while (pre->right && pre->right != curr)
+            {
+                pre = pre->right;
+            }
+            if (pre->right == curr)
+            {
+                // in(curr)
+                if (prev && prev->val >= curr->val)
+                    res = false;
+                prev = curr;
+                pre->right = nullptr;
+                curr = curr->right;
+            }
+            else
+            {
+                pre->right = curr;
+                curr = curr->left;
+            }
+        }
+        else
+        {
+            // in(curr)
+            if (prev && prev->val >= curr->val)
+                res = false;
+            prev = curr;
+            curr = curr->right;
+        }
+    }
+    return res;
+}
+// TC O(n)
+// SC O(1)
+
 // ! insert in BST
 TreeNode *insertIntoBST(TreeNode *root, int val)
 {
@@ -1543,15 +1587,338 @@ TreeNode *deleteNode(TreeNode *root, int key)
 // Space : O(h) recursion stack
 
 // ! LCA in BST
-TreeNode* lowestCommonAncestor(TreeNode* root, TreeNode* p, TreeNode* q) {
-        if(root->val < p->val && root->val < q->val)
-        return lowestCommonAncestor(root->right,p,q);
-        else if(root->val > p->val && root->val > q->val)
-        return lowestCommonAncestor(root->left,p,q);
-        return root;
-    }
+TreeNode *lowestCommonAncestor(TreeNode *root, TreeNode *p, TreeNode *q)
+{
+    if (root->val < p->val && root->val < q->val)
+        return lowestCommonAncestor(root->right, p, q);
+    else if (root->val > p->val && root->val > q->val)
+        return lowestCommonAncestor(root->left, p, q);
+    return root;
+}
 // Time  : O(n) visit each node once
 // Space : O(h) recursion stack
+
+// !BST two sum
+bool findTarget(TreeNode *root, int k)
+{
+    unordered_set<int> s;
+    bool res = false;
+    stack<TreeNode *> st;
+    while (root || !st.empty())
+    {
+        while (root)
+        {
+            st.push(root);
+            root = root->left;
+        }
+        TreeNode *curr = st.top();
+        st.pop();
+        // in(curr)
+        if (s.count(k - curr->val))
+            return true;
+        s.insert(curr->val);
+        root = curr->right;
+    }
+    return res;
+}
+// TC O(n)
+// SC O(n) unordered_Set
+
+// ! BST Iterator
+class BSTIterator
+{
+    stack<TreeNode *> st;
+
+    void pushAll(TreeNode *node)
+    {
+        while (node)
+        {
+            st.push(node);
+            node = node->left;
+        }
+    }
+
+public:
+    BSTIterator(TreeNode *root)
+    {
+        pushAll(root);
+    }
+
+    int next()
+    {
+        TreeNode *node = st.top();
+        st.pop();
+        pushAll(node->right);
+        return node->val;
+    }
+
+    bool hasNext() const
+    {
+        return !st.empty();
+    }
+};
+// Constructor: O(h)
+// next(): amortized O(1) Each node is pushed once and popped once.
+// Total stack ops = 2n → O(n) Spread across n next() calls → amortized O(1).
+// hasNext(): O(1)
+// SC: O(h)
+
+// ! two sum using bst iterator
+class BSTIterator
+{
+    stack<TreeNode *> st;
+    bool isLeft;
+
+    void pushAll(TreeNode *node)
+    {
+        while (node)
+        {
+            st.push(node);
+            node = isLeft ? node->left : node->right;
+        }
+    }
+
+public:
+    BSTIterator(TreeNode *root, bool left)
+    {
+        isLeft = left;
+        pushAll(root);
+    }
+
+    int next()
+    {
+        TreeNode *node = st.top();
+        st.pop();
+
+        if (isLeft)
+            pushAll(node->right);
+        else
+            pushAll(node->left);
+
+        return node->val;
+    }
+
+    bool hasNext()
+    {
+        return !st.empty();
+    }
+};
+
+bool findTarget(TreeNode *root, int k)
+{
+    if (!root)
+        return false;
+
+    BSTIterator l(root, true);
+    BSTIterator r(root, false);
+
+    int i = l.next();
+    int j = r.next();
+
+    while (i < j)
+    {
+        int sum = i + j;
+        if (sum == k)
+            return true;
+        else if (sum < k)
+        {
+            if (l.hasNext())
+                i = l.next();
+            else
+                break;
+        }
+        else
+        {
+            if (r.hasNext())
+                j = r.next();
+            else
+                break;
+        }
+    }
+    return false;
+}
+// TC O(N)
+// SC O(H)x2
+
+void recoverTree(TreeNode *root)
+{
+    TreeNode *prev = nullptr;
+    TreeNode *first = nullptr;
+    TreeNode *second = nullptr;
+    TreeNode *curr = root;
+    while (curr)
+    {
+        if (curr->left)
+        {
+            TreeNode *pre = curr->left;
+            while (pre->right && pre->right != curr)
+                pre = pre->right;
+
+            if (pre->right == curr)
+            {
+                // in(curr)
+                if (prev && prev->val > curr->val)
+                {
+                    if (!first)
+                        first = prev;
+                    second = curr;
+                }
+                prev = curr;
+                pre->right = nullptr;
+                curr = curr->right;
+            }
+            else
+            {
+                pre->right = curr;
+                curr = curr->left;
+            }
+        }
+        else
+        {
+            // in(Curr)
+            if (prev && prev->val > curr->val)
+            {
+                if (!first)
+                    first = prev;
+                second = curr;
+            }
+            prev = curr;
+            curr = curr->right;
+        }
+    }
+    // cout<<first->val<<" "<<second->val;
+    swap(first->val, second->val);
+}
+// TC O(n)
+// SC O(1)
+
+// ! Inorder to BST
+TreeNode *buildBST(vector<int> &nums, int i, int j)
+{
+    if (i > j)
+        return nullptr;
+    int mid = i + (j - i + 1) / 2;
+    TreeNode *node = new TreeNode(nums[mid]);
+    node->left = buildBST(nums, i, mid - 1);
+    node->right = buildBST(nums, mid + 1, j);
+    return node;
+}
+TreeNode *sortedArrayToBST(vector<int> &nums)
+{
+    TreeNode *res = buildBST(nums, 0, nums.size() - 1);
+    return res;
+}
+// TC O(N) Every recursive call creates one node, Each element is used exactly once to create a node.
+// SC O(log₂ n) Because you choose the middle every time, the tree is height-balanced ≈ log₂ n
+
+// ! BST from preorder
+/*
+Create a new node
+
+Pop elements while new_value > stack.top()->val
+
+The last popped node becomes the parent (right child case)
+
+If nothing was popped → new node is left child of stack top
+
+Push new node to stack
+
+The last popped node is the parent for the right child.
+If nothing was popped, the node is the left child of stack top.
+ */
+TreeNode *bstFromPreorder(vector<int> &preorder)
+{
+    if (preorder.empty())
+        return nullptr;
+
+    // Stack will store path of nodes
+    stack<TreeNode *> st;
+
+    // First element is always root
+    TreeNode *root = new TreeNode(preorder[0]);
+    st.push(root);
+
+    // Process remaining elements
+    for (int i = 1; i < preorder.size(); i++)
+    {
+        TreeNode *node = new TreeNode(preorder[i]);
+        TreeNode *parent = nullptr;
+
+        /*
+            Pop until we find a value greater than current node.
+            The last popped node is the parent for RIGHT child.
+        */
+        while (!st.empty() && node->val > st.top()->val)
+        {
+            parent = st.top();
+            st.pop();
+        }
+
+        /*
+            Case 1:
+            If we popped at least one node,
+            current node is RIGHT child of last popped node
+        */
+        if (parent != nullptr)
+        {
+            parent->right = node;
+        }
+        /*
+            Case 2:
+            Otherwise, current node is LEFT child of stack top
+        */
+        else
+        {
+            st.top()->left = node;
+        }
+
+        // Push current node for future children
+        st.push(node);
+    }
+
+    return root;
+}
+// TC O(n) Each node pushed and popped once
+// SC O(h)
+
+// ! Largest bst in bt
+struct Info
+{
+    int sum, mx, mn;
+    bool isBST;
+};
+int ans = 0;
+Info largestBST(TreeNode *node)
+{
+    if (!node)
+        return {0, INT_MIN, INT_MAX, true};
+
+    Info l = largestBST(node->left);
+    Info r = largestBST(node->right);
+
+    if (l.isBST && r.isBST && node->val < r.mn && node->val > l.mx)
+    {
+        Info curr;
+        curr.isBST = true;
+        curr.sum = node->val + l.sum + r.sum;
+        curr.mx = max(node->val, r.mx);
+        curr.mn = min(node->val, l.mn);
+        ans = max(ans, curr.sum);
+        return curr;
+    }
+    else
+    {
+        return {0, INT_MAX, INT_MIN, false};
+    }
+}
+int maxSumBST(TreeNode *root)
+{
+    largestBST(root);
+    return ans;
+}
+
+// Time Complexity: O(N)
+// Space Complexity: O(H), where H is height of tree
 
 int main()
 {
