@@ -3,6 +3,7 @@
 #include <vector>
 #include <algorithm>
 #include <unordered_map>
+#include<queue>
 using namespace std;
 
 struct ListNode
@@ -619,6 +620,38 @@ Node *copyRandomList2(Node *head)
 
     return copyHead;
 }
+// ! merge k sorted lists
+class Solution {
+    struct Compare {
+        bool operator()(ListNode* a, ListNode* b) {
+            return a->val > b->val; // min-heap
+        }
+    };
+
+public:
+    ListNode* mergeKLists(vector<ListNode*>& lists) {
+        ListNode* dummy = new ListNode(-1);
+        ListNode* tail = dummy;
+
+        priority_queue<ListNode*, vector<ListNode*>, Compare> pq;
+
+        for (auto node : lists) {
+            if (node) pq.push(node);
+        }
+
+        while (!pq.empty()) {
+            ListNode* top = pq.top(); pq.pop();
+            tail->next = top;
+            tail = top;
+
+            if (top->next)
+                pq.push(top->next);
+        }
+
+        return dummy->next;
+    }
+};
+
 
 // LRU cache (doubly linked list)
 int main()

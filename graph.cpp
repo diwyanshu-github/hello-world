@@ -205,6 +205,78 @@ int orangesRotting(vector<vector<int>> &grid)
         return freshCount == 0 ? minutes - 1 : -1;
     }
 }
+class Solution
+{
+public:
+    // 8 possible knight moves
+    static constexpr int dx[8] = {2, 1, -1, -2, 2, 1, -1, -2};
+    static constexpr int dy[8] = {1, 2, 2, 1, -1, -2, -2, -1};
+
+    int minStepToReachTarget(vector<int> &KnightPos,
+                             vector<int> &TargetPos,
+                             int N)
+    {
+
+        /*
+        Intuition:
+        - This is a shortest path problem on an unweighted grid.
+        - Each knight move has equal cost → use BFS.
+        - Each BFS level represents 1 move.
+        - Use a visited chessboard to avoid revisiting squares.
+        - Since positions are 1-based, use size (N+1) x (N+1).
+        */
+
+        // Queue stores current knight positions
+        queue<pair<int, int>> q;
+
+        // Visited chessboard (1-based indexing)
+        vector<vector<int>> visited(N + 1, vector<int>(N + 1, 0));
+
+        // Push starting position
+        q.push({KnightPos[0], KnightPos[1]});
+        visited[KnightPos[0]][KnightPos[1]] = 1;
+
+        int steps = 0;
+
+        // Standard BFS
+        while (!q.empty())
+        {
+            int sz = q.size(); // number of nodes in current BFS level
+
+            for (int i = 0; i < sz; i++)
+            {
+                auto [x, y] = q.front();
+                q.pop();
+
+                // If target reached, return steps taken
+                if (x == TargetPos[0] && y == TargetPos[1])
+                    return steps;
+
+                // Explore all 8 knight moves
+                for (int d = 0; d < 8; d++)
+                {
+                    int nx = x + dx[d];
+                    int ny = y + dy[d];
+
+                    // 1-based boundary check + visited check
+                    if (nx >= 1 && ny >= 1 && nx <= N && ny <= N &&
+                        visited[nx][ny] == 0)
+                    {
+
+                        visited[nx][ny] = 1; // mark visited on PUSH
+                        q.push({nx, ny});
+                    }
+                }
+            }
+
+            // One full BFS level completed → one move
+            steps++;
+        }
+
+        // Target not reachable
+        return -1;
+    }
+};
 
 // ! dfs
 void solveDFS(vector<vector<int>> &adj, vector<bool> &vis, int i, vector<int> &res)
