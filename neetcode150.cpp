@@ -10,6 +10,8 @@ using namespace std;
 #include <unordered_set>
 #include <algorithm> // reverse
 #include <numeric>
+#include <string>
+#include <sstream>
 #include <cmath>
 struct TreeNode
 {
@@ -1934,6 +1936,1336 @@ int swimInWater(vector<vector<int>> &grid)
     }
     return mn;
 }
+
+// !encode decode string
+/*
+Design an algorithm to encode a list of strings into a single string
+and decode it back to the original list.
+
+Sample:
+Input: ["lint","code","love",""]
+
+Encoded:
+"4#lint4#code4#love0#"
+
+Decoded:
+["lint","code","love",""]
+
+Time Complexity: O(n)
+Space Complexity: O(1) extra (excluding output)
+*/
+class Codec
+{
+public:
+    string encode(vector<string> &strs)
+    {
+        string e;
+        for (string &s : strs)
+        {
+            int l = s.size();
+            e += to_string(l) + "#";
+            e += s;
+        }
+        return e;
+    }
+    vector<string> decode(string s)
+    {
+        vector<string> res;
+        int i = 0;
+        int sz = s.size();
+        while (i < sz)
+        {
+            int len = 0;
+            string curr = "";
+            while (s[i] != '#')
+            {
+                len = len * 10 + (s[i] - '0');
+                i++;
+            }
+            i++; // skip #
+            curr = s.substr(i, len);
+            res.push_back(curr);
+            i += len;
+        }
+        return res;
+    }
+};
+
+// !Partition Lables
+// two ways O(n) greedy, O(nlogn) intervals
+vector<int> partitionLabels(string s)
+{
+    vector<int> res;
+    map<char, pair<int, int>> m; // d {start,end};
+    // at last iterate map and merge overlapping intervals
+    for (int i = 0; i < s.size(); i++)
+    {
+        if (m.count(s[i]))
+        {
+            // auto [start, end] = m[s[i]];
+            // m[s[i]] = {start, i};
+            auto &p = m[s[i]];
+            p.second = i;
+        }
+        else
+        {
+            m[s[i]] = {i, i};
+        }
+    }
+    // merge intervals
+    // need sorted intervals
+    vector<vector<int>> intervals;
+    for (auto &[c, interval] : m)
+    {
+        auto [start, end] = interval;
+        intervals.push_back({start, end});
+    }
+    sort(intervals.begin(), intervals.end());
+    int start = intervals[0][0];
+    int end = intervals[0][1];
+
+    for (int i = 1; i < intervals.size(); i++)
+    {
+        int currS = intervals[i][0];
+        int currE = intervals[i][1];
+        if (currS < end)
+        { // merge
+            end = max(end, currE);
+        }
+        else
+        {
+            res.push_back(end - start + 1);
+            start = currS;
+            end = currE;
+        }
+    }
+    res.push_back(end - start + 1);
+    return res;
+}
+// TC O(n) SC O(1) 26 characters
+vector<int> partitionLabels(string s)
+{
+    vector<int> last(26, 0);
+    for (int i = 0; i < s.size(); i++)
+    {
+        last[s[i] - 'a'] = i;
+    }
+    /*
+    eg: defeghhijh
+    d → 0
+    e → 3
+    f → 2
+    g → 4
+    h → 9
+    i → 7
+    j → 8
+
+    now on iterating
+    d e f e g h h i j h
+    0 3 2 3 4 9 9 7 8 9
+
+    each char tells limit till which it can extend its interval
+    so at every char update max limit
+    if curr index is the max limit so partition
+*/
+
+    int start = 0;
+    int end = 0;
+    vector<int> res;
+    for (int i = 0; i < s.size(); i++)
+    {
+        end = max(end, last[s[i] - 'a']);
+        if (i == end)
+        {
+            res.push_back(end - start + 1);
+            start = i + 1;
+        }
+    }
+    return res;
+}
+
+// ! alien dictionary
+/*
+LeetCode 269 / Alien Dictionary
+
+Problem:
+Given words sorted in an alien language, determine the character order.
+
+Sample:
+words = ["wrt","wrf","er","ett","rftt"]
+Output: "wertf"
+
+Idea:
+1. Compare adjacent words to find first differing character → create edge (u → v).
+2. Build graph + indegree.
+3. Apply Kahn's Topological Sort (BFS).
+4. If result size < unique chars → cycle → invalid.
+
+Time Complexity: O(total characters in words + edges)
+Space Complexity: O(unique characters + edges)
+*/
+string findOrder(vector<string> &words)
+{
+    unordered_map<char, vector<char>> adj;
+    unordered_map<char, int> indegree;
+
+    // collect all characters
+    for (auto &w : words)
+        for (char c : w)
+            indegree[c] = 0;
+
+    // build graph
+    for (int i = 0; i < words.size() - 1; i++)
+    {
+        string &w1 = words[i];
+        string &w2 = words[i + 1];
+
+        if (w1.size() > w2.size() && w1.substr(0, w2.size()) == w2)
+            return "";
+
+        int j = 0;
+        while (j < min(w1.size(), w2.size()) && w1[j] == w2[j])
+            j++;
+
+        if (j < min(w1.size(), w2.size()))
+        {
+            adj[w1[j]].push_back(w2[j]);
+        }
+    }
+
+    // compute indegree
+    for (auto &[u, nodes] : adj)
+        for (char v : nodes)
+            indegree[v]++;
+
+    queue<char> q;
+    for (auto &[c, deg] : indegree)
+        if (deg == 0)
+            q.push(c);
+
+    string res;
+
+    while (!q.empty())
+    {
+        char u = q.front();
+        q.pop();
+        res += u;
+
+        for (char v : adj[u])
+        {
+            if (--indegree[v] == 0)
+                q.push(v);
+        }
+    }
+
+    if (res.size() != indegree.size())
+        return "";
+    return res;
+}
+/*
+// !Check if graph is a valid tree.
+
+Conditions:
+1. Number of edges must be n-1.
+2. Graph must be connected.
+3. Graph must have no cycle.
+
+Approach:
+Run DFS from node 0 with parent tracking.
+If we see a visited neighbor that is not parent → cycle.
+After DFS check if all nodes were visited.
+
+Time:  O(V + E)
+Space: O(V)
+*/
+
+bool dfs(int node, int parent, vector<vector<int>> &adj, vector<bool> &vis)
+{
+    vis[node] = true;
+    for (int nei : adj[node])
+    {
+        if (!vis[nei])
+        {
+            if (dfs(nei, node, adj, vis))
+            {
+                return true;
+            }
+        }
+        else if (nei != parent)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+int isTree(int n, int m, vector<vector<int>> &edges)
+{
+    if (m != n - 1)
+        return 0;
+    vector<vector<int>> adj(n);
+
+    // build adjacency list
+    for (auto &e : edges)
+    {
+        adj[e[0]].push_back(e[1]);
+        adj[e[1]].push_back(e[0]);
+    }
+    vector<bool> vis(n, false);
+    bool cycle = dfs(0, -1, adj, vis);
+    if (cycle)
+        return 0;
+    for (int i = 0; i < n; i++)
+    {
+        if (vis[i] == false)
+            return 0;
+    }
+    return 1;
+}
+// ! meeting rooms
+/*
+LC 252 - Meeting Rooms
+Sort intervals by start time and check overlap.
+If curr.start < prev.end → overlap → return false.
+Else update prev.end.
+
+Time: O(n log n)
+Space: O(1)
+*/
+bool canAttend(vector<vector<int>> &arr)
+{
+    // Code Here
+    sort(arr.begin(), arr.end());
+    int prevEnd = arr[0][1];
+    for (int i = 1; i < arr.size(); i++)
+    {
+        int nextStart = arr[i][0];
+        int nextEnd = arr[i][1];
+
+        if (nextStart < prevEnd)
+            return false;
+        prevEnd = nextEnd;
+    }
+    return true;
+}
+
+// !meeting rooms 2
+/*
+LC 253 - Meeting Rooms II
+
+Given meeting intervals [start,end], return minimum rooms needed
+so that no meetings overlap in the same room.
+
+Example:
+intervals = {{0,30},{5,10},{15,20}}
+
+0-30 uses room1
+5-10 overlaps → room2
+15-20 uses freed room2
+
+Answer = 2
+
+Sort meetings by start time.
+Use a min-heap storing end times of active meetings.
+
+For each meeting:
+- Pop all meetings that ended before current start (room freed).
+- Push current meeting's end time (occupy a room).
+- Track maximum heap size.
+
+Heap size = rooms currently used
+Max heap size = minimum rooms required
+
+Time: O(n log n)
+Space: O(n)
+*/
+int minMeetingRooms(vector<vector<int>> &arr)
+{
+    if (arr.size() <= 1)
+        return arr.size();
+    sort(arr.begin(), arr.end());
+    int end = arr[0][1];
+    priority_queue<int, vector<int>, greater<int>> q;
+    q.push(end);
+
+    int ans = 1;
+    for (int i = 1; i < arr.size(); i++)
+    {
+        int currStart = arr[i][0];
+        int currEnd = arr[i][1];
+
+        /*
+        CASE-1
+            curr meeting starts after prev meet ends
+            will remove that from room, and take its place
+
+        CASE-2
+            curr meeting starts before quickest prev meetings end
+            will take another room, push in heap
+        */
+        while (!q.empty() && currStart >= q.top())
+            q.pop(); // free finished rooms
+
+        q.push(currEnd);
+        ans = max(ans, (int)q.size());
+    }
+    return ans;
+}
+
+/*
+// !LC 239 - Sliding Window Maximum
+
+Problem:
+Given an array nums and window size k, return the maximum element in every
+contiguous subarray of size k.
+
+Sample:
+nums = [1,3,-1,-3,5,3,6,7], k = 3
+windows → max
+[1,3,-1] → 3
+[3,-1,-3] → 3
+[-1,-3,5] → 5
+[-3,5,3] → 5
+[5,3,6] → 6
+[3,6,7] → 7
+
+Intuition:
+Key Idea (LC 239):
+If a number is smaller than a new incoming number,
+it can never become the maximum later.
+So you can remove such smaller elements.
+
+Use a deque (double-ended queue) to store indices of useful elements
+in decreasing order of values.
+
+Discard smaller elements and keep only "useful candidates"
+for maximum in a decreasing deque.
+
+Thus the deque stores only elements that still have a chance
+to be the maximum of the current or future windows.
+
+Use a monotonic decreasing deque storing indices.
+Front always stores index of the largest element in the current window.
+Remove elements:
+1) From front → if they move outside window
+2) From back → if smaller than current element (can't be future max)
+
+Sliding Window Blueprint:
+for each i:
+    remove elements outside window
+    remove smaller elements from back
+    add current index
+    if window formed → record answer
+
+Time Complexity:  O(n)
+(each element pushed once and popped at most once)
+
+Space Complexity: O(k)
+(deque holds at most k indices)
+*/
+
+vector<int> maxSlidingWindow(vector<int> &nums, int k)
+{
+    deque<int> q;
+    vector<int> res;
+
+    for (int i = 0; i < nums.size(); i++)
+    {
+
+        // remove indices outside window
+        if (!q.empty() && q.front() <= i - k)
+            q.pop_front();
+
+        // maintain decreasing deque
+        while (!q.empty() && nums[q.back()] < nums[i])
+            q.pop_back();
+
+        q.push_back(i);
+
+        // record answer when window formed
+        if (i >= k - 1)
+            res.push_back(nums[q.front()]);
+    }
+
+    return res;
+}
+/*
+// !LC 238 - Product of Array Except Self
+
+Build prefix product in result array:
+res[i] = product of elements before i.
+
+Traverse from right maintaining suffix product
+and multiply with res[i].
+
+Each element processed twice.
+
+Time: O(n)
+Space: O(1) extra
+*/
+vector<int> productExceptSelf(vector<int> &nums)
+{
+    int n = nums.size();
+    vector<int> res(n, 1);
+
+    // prefix product
+    for (int i = 1; i < n; i++)
+    {
+        res[i] = nums[i - 1] * res[i - 1];
+    }
+
+    // suffix product
+    int suffix = nums[n - 1];
+    for (int i = n - 2; i >= 0; i--)
+    {
+        res[i] *= suffix;
+        suffix *= nums[i];
+    }
+
+    return res;
+}
+
+/*
+// !LC 1143 - Longest Common Subsequence
+
+If characters match → include them and move both pointers.
+If not → skip one character from either string.
+
+dp[i][j] = LCS length using s1[0..i] and s2[0..j]
+
+Time: O(n*m)
+Space: O(n*m)
+*/
+int solve(int i, int j, string &s1, string &s2, vector<vector<int>> &dp)
+{
+    if (i < 0 || j < 0)
+        return 0;
+    if (dp[i][j] != -1)
+        return dp[i][j];
+    // match then common subsq len increase
+    if (s1[i] == s2[j])
+        return dp[i][j] = 1 + solve(i - 1, j - 1, s1, s2, dp);
+
+    //              i     j
+    // case 1 :  abcd abcde (do j-1)
+
+    // case 2 :  pqrst pqrs (do i-1)
+    //               i    j
+
+    return dp[i][j] = max(solve(i - 1, j, s1, s2, dp), solve(i, j - 1, s1, s2, dp));
+}
+int longestCommonSubsequence(string text1, string text2)
+{
+    int i = text1.size() - 1;
+    int j = text2.size() - 1;
+    vector<vector<int>> dp(i + 1, vector<int>(j + 1, -1));
+    return solve(i, j, text1, text2, dp);
+}
+
+/*
+// !LC 739 - Daily Temperatures
+
+Problem:
+Given an array temperatures where temperatures[i] is the temperature on day i,
+return an array answer such that answer[i] is the number of days until a warmer
+temperature. If no future day exists, answer[i] = 0.
+
+Sample:
+temps = [73,74,75,71,69,72,76,73]
+
+Output:
+[1,1,4,2,1,1,0,0]
+
+
+Idea:
+Use a monotonic decreasing stack storing indices of days.
+Stack keeps days whose next warmer temperature is not found yet.
+
+When a warmer temperature appears:
+    pop all smaller temps from stack
+    answer = current_index - popped_index
+
+Each index pushed once and popped once.
+Time Complexity:  O(n)
+Space Complexity: O(n)
+*/
+vector<int> dailyTemperatures(vector<int> &temp)
+{
+    // next greater after what index
+    stack<int> st;
+    vector<int> res(temp.size(), 0);
+    for (int i = 0; i < temp.size(); i++)
+    {
+        while (!st.empty() && temp[i] > temp[st.top()])
+        {
+            int idx = st.top();
+            st.pop();
+            res[idx] = i - idx;
+        }
+        st.push(i);
+    }
+    return res;
+}
+/*
+// !LC 79 - Word Search
+
+Problem:
+Given a grid of characters and a word, check if the word can be formed
+by sequentially adjacent cells (up, down, left, right).
+A cell can be used only once in a path.
+
+Sample:
+board = [
+["A","B","C","E"],
+["S","F","C","S"],
+["A","D","E","E"]
+]
+
+word = "ABCCED"
+
+Path:
+(0,0)A → (0,1)B → (0,2)C → (1,2)C → (2,2)E → (2,1)D
+
+----------------------------------------------------
+
+Approach (DFS + Backtracking):
+
+1. Iterate over every cell in the board.
+   If board[i][j] == word[0], start DFS from that cell.
+
+2. DFS(r, c, k):
+   r,c = current cell
+   k   = index of next character to match in word
+
+3. Base case:
+   If k == word.size() → all characters matched → return true.
+
+4. From the current cell explore 4 directions:
+      up, down, left, right
+
+5. For each neighbor:
+   - must be inside board
+   - must match word[k]
+   - must not be visited
+
+6. Mark the current cell as visited (e.g. replace with '#'),
+   explore neighbors recursively.
+
+7. After recursion, restore the cell (backtracking).
+
+8. If any DFS path succeeds → return true.
+
+----------------------------------------------------
+
+Key Idea:
+Treat the grid like a graph and try building the word character by
+character using DFS while preventing reuse of the same cell.
+
+----------------------------------------------------
+
+Time Complexity:
+O(m * n * 4^L)
+
+m*n → possible starting cells
+4^L → DFS branching (L = word length)
+
+Space Complexity:
+O(L) recursion stack
+*/
+int dir[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+bool solve(vector<vector<char>> &board, string &word, int r, int c, int k, int m, int n)
+{
+    // cout<<curr<<" ";
+    // if(curr == word) return true;
+    if (k == word.size())
+        return true;
+    for (auto &d : dir)
+    {
+        int nr = r + d[0];
+        int nc = c + d[1];
+        if (nr < m && nc < n && nr >= 0 && nc >= 0 && board[nr][nc] != '#' && board[nr][nc] == word[k])
+        {
+            // curr.push_back(board[nr][nc]);
+            char temp = board[nr][nc];
+            board[nr][nc] = '#';
+            if (solve(board, word, nr, nc, k + 1, m, n))
+                return true;
+            board[nr][nc] = temp;
+            // curr.pop_back();
+        }
+    }
+    return false;
+}
+bool exist(vector<vector<char>> &board, string word)
+{
+    int m = board.size();
+    int n = board[0].size();
+    if (word.size() > m * n)
+        return false;
+    // vector<vector<bool>>vis(m,vector<bool>(n,false));
+    int k = 0;
+    for (int i = 0; i < m; i++)
+    {
+        for (int j = 0; j < n; j++)
+        {
+            if (board[i][j] != word[k])
+                continue;
+            // string curr = "";
+            // curr += board[i][j];
+            char temp = board[i][j];
+            board[i][j] = '#';
+            if (solve(board, word, i, j, k + 1, m, n))
+                return true;
+            board[i][j] = temp;
+        }
+    }
+    return false;
+}
+
+/*
+// !Trie (Prefix Tree)
+
+Each node stores 26 children and end-of-word flag.
+
+Insert:
+create nodes if missing while traversing characters.
+
+Search:
+follow path and check end flag.
+
+StartsWith:
+check if prefix path exists.
+
+Insert      : O(L)
+Search      : O(L)
+StartsWith  : O(L)
+
+Space: O(total characters inserted) when inserting
+*/
+
+class Trie
+{
+    struct TrieNode
+    {
+        TrieNode *links[26] = {nullptr}; // array of pointers to TrieNode objects
+        bool isEnd = false;
+
+        bool contains(char c)
+        {
+            return links[c - 'a'] != nullptr;
+        }
+        void put(char c)
+        {
+            links[c - 'a'] = new TrieNode();
+        }
+        TrieNode *get(char c)
+        {
+            return links[c - 'a'];
+        }
+        void setEnd()
+        {
+            isEnd = true;
+        }
+        bool hasEnded()
+        {
+            return isEnd == true;
+        }
+    };
+    TrieNode *root;
+
+public:
+    Trie()
+    {
+        root = new TrieNode();
+    }
+
+    void insert(string word)
+    {
+        TrieNode *temp = root;
+        for (int i = 0; i < word.size(); i++)
+        {
+            char c = word[i];
+            if (!temp->contains(c))
+                temp->put(c);
+            temp = temp->get(c);
+        }
+        temp->setEnd();
+    }
+
+    bool search(string word)
+    {
+        TrieNode *temp = root;
+        for (int i = 0; i < word.size(); i++)
+        {
+            char c = word[i];
+            if (temp->contains(c))
+                temp = temp->get(c);
+            else
+                return false;
+        }
+        return temp->hasEnded();
+    }
+
+    bool startsWith(string prefix)
+    {
+        TrieNode *temp = root;
+        for (int i = 0; i < prefix.size(); i++)
+        {
+            char c = prefix[i];
+            if (temp->contains(c))
+                temp = temp->get(c);
+            else
+                return false;
+        }
+        return true;
+    }
+};
+
+/*
+// !LC 211 - Add and Search Word
+
+Trie with wildcard search.
+
+Insert:
+Normal Trie insertion.
+
+Search:
+DFS through Trie.
+If character is '.', try all children.
+
+Time:
+O(L) normal
+O(26^L) worst case with wildcards
+*/
+class WordDictionary
+{
+
+public:
+    struct TrieNode
+    {
+        TrieNode *links[26] = {nullptr};
+        bool end = false;
+
+        void setEnd() { end = true; }
+        bool hasEnded() { return end; }
+        TrieNode *get(char c) { return links[c - 'a']; }
+        bool contains(char c) { return links[c - 'a'] != nullptr; }
+        void put(char c) { links[c - 'a'] = new TrieNode(); }
+    };
+    TrieNode *root;
+    WordDictionary() { root = new TrieNode(); }
+
+    void addWord(string word)
+    {
+        TrieNode *temp = root;
+        for (auto c : word)
+        {
+            if (!temp->contains(c))
+                temp->put(c);
+            temp = temp->get(c);
+        }
+        temp->setEnd();
+    }
+    bool dfs(string &word, int i, TrieNode *node)
+    {
+        if (i == word.size())
+        {
+            return node->hasEnded();
+        }
+        char c = word[i];
+        if (c == '.')
+        {
+            for (char t = 'a'; t <= 'z'; t++)
+            {
+                if (node->contains(t) && dfs(word, i + 1, node->get(t)))
+                    return true;
+            }
+        }
+        else
+        {
+            if (!node->contains(c))
+                return false;
+            return dfs(word, i + 1, node->get(c));
+        }
+        return false;
+    }
+    bool search(string word) { return dfs(word, 0, root); }
+};
+
+/*
+// !LeetCode 212 — Word Search II
+Approach: Trie + DFS Backtracking + Trie Pruning Optimization
+
+---------------------------------------------------------------
+PROBLEM
+Given a board of characters and a list of words, return all
+words that can be formed by sequentially adjacent cells
+(up, down, left, right). A cell cannot be reused in a word.
+
+---------------------------------------------------------------
+INTUITION
+
+Naive:
+Run Word Search (LC79) for every word → too slow.
+
+Better idea:
+Store all words in a Trie so common prefixes are shared.
+
+DFS from each board cell:
+- follow Trie edges while moving in board
+- stop early if Trie prefix doesn't exist
+- when Trie node contains a word → add to result
+
+---------------------------------------------------------------
+TRIE STRUCTURE
+
+Each TrieNode stores:
+- links[26] → children
+- word → stores complete word at terminal node
+
+Why store word?
+So we can directly push the word when we reach that node
+without rebuilding the string.
+
+---------------------------------------------------------------
+DFS LOGIC
+
+1. Start DFS only if root contains board[i][j]
+2. Mark cell visited using '#'
+3. Move in 4 directions
+4. Continue only if Trie contains next character
+5. Backtrack by restoring board cell
+
+---------------------------------------------------------------
+DUPLICATE PREVENTION
+
+After finding a word:
+
+    res.push_back(node->word);
+    node->word = "";
+
+This ensures the same word isn't added again.
+
+---------------------------------------------------------------
+TRIE PRUNING OPTIMIZATION
+
+Observation:
+If a Trie node has:
+    node->word == ""
+AND
+    no children
+
+Then no remaining word uses this prefix.
+
+So we delete the branch from parent:
+
+    parent->links[currChar-'a'] = nullptr;
+
+---------------------------------------------------------------
+EXAMPLE
+
+Words = ["oath","eat"]
+
+Trie:
+
+root
+ ├─ o → a → t → h (word="oath")
+ └─ e → a → t     (word="eat")
+
+DFS finds "oath":
+
+1. push "oath"
+2. node->word = ""
+
+Node 'h' has:
+- no children
+- no word
+
+Delete branch:
+
+t->links['h'] = nullptr
+
+Pruning continues upward if nodes become childless.
+
+Final Trie:
+
+root
+ └─ e → a → t (word="eat")
+
+Future DFS starting from 'o' is skipped immediately.
+
+---------------------------------------------------------------
+TIME & SPACE COMPLEXITY (CLEAR VERSION)
+
+Definitions:
+M = number of rows in board
+N = number of columns in board
+W = number of words
+L = maximum length of a word
+
+------------------------------------------------
+
+BUILD TRIE
+
+Each word inserts L characters.
+
+Time:
+O(W * L)
+
+Space:
+O(W * L)
+(worst case when no prefixes overlap)
+
+------------------------------------------------
+
+DFS SEARCH
+
+We start DFS from every board cell.
+
+Total starts:
+M * N
+
+From each cell we explore at most 4 directions.
+
+Depth of DFS = at most L
+(max word length)
+
+Worst case branching:
+4 * 3^(L-1)
+
+Explanation:
+First step → 4 directions
+Next steps → cannot go back to previous cell
+so only 3 choices remain.
+
+Worst case DFS per cell:
+
+O(4 * 3^(L-1)) ≈ O(3^L)
+
+Total worst-case DFS:
+
+O(M * N * 3^L)
+
+------------------------------------------------
+
+BUT IN PRACTICE
+
+Trie prefix checking stops DFS early.
+
+If board prefix doesn't exist in Trie:
+DFS stops immediately.
+
+Trie pruning optimization further reduces work
+because used prefixes are removed.
+
+So real runtime is much smaller.
+
+------------------------------------------------
+
+FINAL COMPLEXITY
+
+Time:
+Trie build  → O(W * L)
+DFS search → O(M * N * 3^L)
+
+Space:
+Trie → O(W * L)
+DFS stack → O(L)
+---------------------------------------------------------------
+KEY INTERVIEW TALKING POINTS
+
+Trie → avoids repeating prefix checks
+DFS → explore board paths
+Backtracking → mark '#' to prevent reuse
+Store word in Trie node
+Clear word to avoid duplicates
+Prune Trie branches when useless
+
+This pruning significantly speeds up LeetCode runtime.
+*/
+
+class Trie
+{
+public:
+    struct TrieNode
+    {
+        TrieNode *links[26] = {nullptr};
+        string word = "";
+
+        bool contains(char c) { return links[c - 'a'] != nullptr; }
+        TrieNode *get(char c) { return links[c - 'a']; }
+        void put(char c) { links[c - 'a'] = new TrieNode(); }
+
+        // >OPTIMIZATION and EXAMPLE
+        // Remove Trie branches when:
+        // node has no children AND node->word == ""
+        // preventing future DFS from exploring already exhausted prefixes
+
+        // >EXAMPLE
+        // eg trie "oath", "eat"
+        // once a word (o->a->t->h) is found and stored node->word = ""
+        // and it also has no links/child
+        // once "o->a->t->h" found, and 'h' has no more links
+        // it means no remaining words use this prefix
+        // so we can delete that branch( t->h ) from the Trie.
+        // deleting means t->links[h-'a'] = nullptr;
+        // for dfs o->a->t->h,
+        // first i j will be at h, that is delted
+        // then when recusion comes back it deletes t,o,a
+        bool hasChildren()
+        {
+            for (int i = 0; i < 26; i++)
+                if (links[i])
+                    return true;
+            return false;
+        }
+    };
+
+    TrieNode *root;
+
+    Trie() { root = new TrieNode(); }
+
+    void addWord(string word)
+    {
+        TrieNode *node = root;
+        for (char c : word)
+        {
+            if (!node->contains(c))
+                node->put(c);
+            node = node->get(c);
+        }
+        node->word = word;
+    }
+};
+
+class Solution
+{
+public:
+    int dir[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+
+    // void dfs(vector<vector<char>>& board, int r, int c, Trie::TrieNode* node, vector<string>& res){
+    void dfs(vector<vector<char>> &board, int r, int c, Trie::TrieNode *node, Trie::TrieNode *parentNode, char currChar, vector<string> &res)
+    {
+
+        if (node->word != "")
+        {
+            res.push_back(node->word);
+            node->word = ""; // avoid duplicates
+        }
+
+        char temp = board[r][c];
+        board[r][c] = '#';
+
+        int m = board.size();
+        int n = board[0].size();
+
+        for (auto &d : dir)
+        {
+            int nr = r + d[0];
+            int nc = c + d[1];
+
+            if (nr >= 0 && nc >= 0 && nr < m && nc < n && board[nr][nc] != '#')
+            {
+                char next = board[nr][nc];
+
+                if (node->contains(next))
+                {
+                    dfs(board, nr, nc, node->get(next), node, next, res);
+                }
+            }
+        }
+
+        board[r][c] = temp;
+        // Pruning
+        if (!node->hasChildren() && node->word == "")
+        {
+            parentNode->links[currChar - 'a'] = nullptr;
+        }
+    }
+
+    vector<string> findWords(vector<vector<char>> &board, vector<string> &words)
+    {
+
+        Trie trie;
+
+        for (string &w : words)
+            trie.addWord(w);
+
+        int m = board.size();
+        int n = board[0].size();
+
+        vector<string> res;
+
+        for (int i = 0; i < m; i++)
+        {
+            for (int j = 0; j < n; j++)
+            {
+
+                char c = board[i][j];
+
+                if (trie.root->contains(c))
+                {
+                    // dfs(board, i, j, trie.root->get(c), res);
+                    dfs(board, i, j, trie.root->get(c), trie.root, c, res);
+                }
+            }
+        }
+
+        return res;
+    }
+};
+
+// !For LeetCode 202 — Happy Number
+/*
+
+!two solutions: without using extra space
+ n ≤ 2^31 − 1 → at most 10 digits
+ Each iteration:
+ compute sum of squares of digits
+ work per iteration = O(10) ≈ O(1)
+
+ After first step:
+ max possible value = 10 * 9^2 = 810
+
+ So all future numbers are in range [1..810]
+
+ Therefore the sequence can only visit
+ at most ~810 different values before
+ either reaching 1 or forming a cycle.
+ Let k = number of different sums seen before cycle or reaching 1
+
+ Time Complexity:
+ O(k) or O(810)
+ Each step computes sum of squares of digits
+ digits ≤ 10 (since n ≤ 2^31−1), so constant work per step
+
+ Space Complexity:
+ O(k)
+ unordered_set stores all previously seen sums to detect cycle
+
+ n ≤ 2^31 − 1 → at most 10 digits
+ Each iteration:
+ compute sum of squares of digits
+ work per iteration = O(10) ≈ O(1)
+
+ After first step:
+ max possible value = 10 * 9^2 = 810
+
+ So all future numbers are in range [1..810]
+
+ Therefore the sequence can only visit
+ at most ~810 different values before
+ either reaching 1 or forming a cycle.
+
+*/
+
+bool solve(int num, unordered_set<int> &sums)
+{
+    // find sum of squares
+    int currSum = 0;
+    while (num != 0)
+    {
+        int dig = num % 10;
+        num /= 10;
+        currSum += dig * dig;
+    }
+    if (sums.count(currSum))
+        return false;
+    else if (currSum == 1)
+        return true;
+    else
+    {
+        sums.insert(currSum);
+        return solve(currSum, sums);
+    }
+}
+bool isHappy(int n)
+{
+    // find sum of squares of digits
+    // if sum already achieved, cycle
+    // if sum==1 true
+    unordered_set<int> sums;
+    return solve(n, sums);
+}
+
+int sumOfSquares(int num)
+{
+    // find sum of squares
+    int currSum = 0;
+    while (num != 0)
+    {
+        int dig = num % 10;
+        num /= 10;
+        currSum += dig * dig;
+    }
+    return currSum;
+}
+bool isHappy(int n)
+{
+    if (sumOfSquares(n) == 1)
+        return true;
+    int slow = sumOfSquares(n);
+    int fast = sumOfSquares(sumOfSquares(n));
+
+    while (slow != fast)
+    {
+        if (slow == 1 || fast == 1)
+            return true;
+        slow = sumOfSquares(slow);
+        fast = sumOfSquares(sumOfSquares(fast));
+    }
+    return false;
+}
+
+/*
+// !Max Area of Island (LC 695)
+
+DFS from each cell with value 1.
+Mark visited by setting grid[r][c] = 0.
+
+Island area = 1 (current cell) + DFS of all 4 neighbors.
+
+Track maximum area across all islands.
+
+Time: O(m*n)  -> each cell visited once
+Space: O(m*n) -> recursion stack worst case
+*/
+int dir[4][2] = {{0, 1}, {1, 0}, {0, -1}, {-1, 0}};
+int dfs(vector<vector<int>> &grid, int r, int c)
+{
+    grid[r][c] = 0;
+    int ans = 1;
+    for (int i = 0; i < 4; i++)
+    {
+        int nr = r + dir[i][0];
+        int nc = c + dir[i][1];
+        if (nr >= 0 && nc >= 0 && nr < grid.size() && nc < grid[0].size() && grid[nr][nc] != 0)
+        {
+            ans += dfs(grid, nr, nc);
+        }
+    }
+    return ans;
+}
+int maxAreaOfIsland(vector<vector<int>> &grid)
+{
+    int ans = 0;
+    int m = grid.size();
+    int n = grid[0].size();
+    for (int i = 0; i < m; i++)
+    {
+        for (int j = 0; j < n; j++)
+        {
+            if (grid[i][j] == 1)
+            {
+                int size = dfs(grid, i, j);
+                ans = max(ans, size);
+            }
+        }
+    }
+    return ans;
+}
+
+// ! ==========
+
 // !=============================================================================
 
 int missingNumber(vector<int> &nums)

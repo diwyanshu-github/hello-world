@@ -1833,6 +1833,86 @@ vector<int> articulationPoints(int n, vector<int> adj[])
         return {-1};
     return ans;
 }
+/*
+LeetCode 1631. Path With Minimum Effort
+
+Problem:
+Given a grid of heights, move from (0,0) to (m-1,n-1).
+Effort of a path = maximum absolute difference between adjacent cells.
+Return the minimum possible effort.
+
+Test Case:
+heights = {
+  {1, 2, 2},
+  {3, 8, 2},
+  {5, 3, 5}
+}
+Answer = 2
+Path: 1→2→2→2→5, max diff = 2
+
+Intuition / Approach:
+This is a Dijkstra problem where cost = path effort (max diff so far).
+Use a min-heap storing {effort, row, col}. For each move:
+newEffort = max(currentEffort, abs(height diff)).
+First time we pop destination → minimum effort.
+
+Time Complexity:  O(m*n log(m*n))
+Space Complexity: O(m*n)
+*/
+/*
+Swim in Rising Water vs Path With Minimum Effort — Visited Rule
+
+Swim in Rising Water:
+- Cost = max cell height on path.
+- Cell height is intrinsic (fixed, global).
+- First time a cell is discovered → already optimal.
+- Safe to mark visited on PUSH.
+- Similar to Prim’s MST (growing region by smallest boundary).
+
+Path With Minimum Effort:
+- Cost = max abs diff along path.
+- Cost is path-dependent, not intrinsic to the cell.
+- A cell may be reached later with lower effort.
+- Must mark visited on POP (Dijkstra property).
+
+Quick Rule:
+If node cost is intrinsic/global → visit on push.
+If cost depends on path → visit on pop.
+*/
+using T = tuple<int, int, int>;
+// height-diff row col
+vector<vector<int>> dir = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+int minimumEffortPath(vector<vector<int>> &grid)
+{
+    int m = grid.size();
+    int n = grid[0].size();
+    vector<vector<int>> vis(m, vector<int>(n, 0));
+    priority_queue<T, vector<T>, greater<T>> q; // min heap
+    q.push({0, 0, 0});
+    while (!q.empty())
+    {
+        auto [bestEffort, r, c] = q.top();
+        q.pop();
+        if (vis[r][c])
+            continue;
+        vis[r][c] = 1;
+        if (r == m - 1 && c == n - 1)
+            return bestEffort;
+        for (auto &d : dir)
+        {
+            int nr = r + d[0];
+            int nc = c + d[1];
+            if (nr < 0 || nc < 0 || nr >= m || nc >= n)
+                continue;
+            if (vis[nr][nc] == 1)
+                continue;
+            int diff = abs(grid[nr][nc] - grid[r][c]);
+            int newEffort = max(bestEffort, diff);
+            q.push({newEffort, nr, nc});
+        }
+    }
+    return -1;
+}
 int main()
 {
 
