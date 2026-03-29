@@ -197,7 +197,6 @@ void NQueens(vector<string> &grid, int row, int n, vector<vector<string>> &res, 
     }
 }
 
-
 // TC: O(4^(n²))  Each cell can go in up to 4 directions,
 // SC: O(n²) Max recursion depth/path length ≈ n²
 
@@ -293,14 +292,35 @@ bool sudoko(vector<vector<char>> &grid, int row, int col)
 // Each breakpoint has 2 choices: cut or don’t cut.
 // So ≈ 2ⁿ possible partitions → ~2ⁿ recursive calls.
 // Each call may check substrings → O(n).
-// TC: O(n · 2ⁿ)
+// TC: O(n^2 · 2ⁿ)
 //! 2ⁿ = total nodes in recursion tree
 //! recursion depth = n (one cut per index)
 // SC: O(n)
+// ! use DP for palindrome check
+/*
+//  !PROBLEM: Palindrome Partitioning (LC 131)
+
+ TC (Without DP): O(N * 2^N)
+ 2^N possible partitions * O(N) check per substring.
+
+ TC (With DP/Memo): O(2^N)
+ O(N^2) to precompute/memoize + 2^N partitions * O(1) lookup.
+
+ SC: O(N^2)
+ To store the isPalindrome[i][j] memo table.
+
+ LOGIC:
+ 1. DP: Check if s[i...j] is palindrome via:
+    isPal(i, j) = (s[i] == s[j]) && isPal(i+1, j-1)
+ 2. Backtrack: Try every split point 'j' from 'i'.
+    If s[i...j] is valid, recurse for j+1.
+ 3. Efficiency: Only use s.substr() when pushing to the temp path.
+*/
 bool isPalindrome(string &s, int start, int end)
 {
     // Loop while start < end
-    while (start < end){
+    while (start < end)
+    {
         // If mismatch, not a palindrome
         if (s[start] != s[end])
             return false;
@@ -336,6 +356,54 @@ void palindromePartition(int index, string &s, vector<string> &path, vector<vect
         }
     }
 }
+class Solution
+{
+    // Declare the memo, but don't give it a fixed size here if you want to be safe
+    vector<vector<int>> memo;
+
+    bool check(int i, int j, string &s)
+    {
+        if (i >= j)
+            return true;
+        if (memo[i][j] != -1)
+            return memo[i][j];
+        if (s[i] != s[j])
+            return memo[i][j] = 0;
+        return memo[i][j] = check(i + 1, j - 1, s);
+    }
+
+    void solve(int i, string &s, vector<string> &temp, vector<vector<string>> &res)
+    {
+        if (i == s.size())
+        {
+            res.push_back(temp);
+            return;
+        }
+        for (int j = i; j < s.size(); j++)
+        {
+            if (check(i, j, s))
+            {
+                temp.push_back(s.substr(i, j - i + 1));
+                solve(j + 1, s, temp, res);
+                temp.pop_back();
+            }
+        }
+    }
+
+public:
+    vector<vector<string>> partition(string s)
+    {
+        int n = s.size();
+        // RESET/RESIZE memo for every new test case
+        memo.assign(n, vector<int>(n, -1));
+
+        vector<string> temp;
+        vector<vector<string>> res;
+        solve(0, s, temp, res);
+        return res;
+    }
+};
+
 // 2ⁿ recursive calls (n indexes to cut, at each index cut/not cut two options, 2 x 2 x 2...n times)
 // Each find() is O(m) where m = dic.size().
 // Substring creation s.substr(i, j-i+1) is O(n).
@@ -413,27 +481,29 @@ string getPermutation(int n, int k)
 
 // Time: O(n²) Each of n positions does an erase on a vector → O(n) each → n·n.
 // Space: O(n) for nums, fact, and ans
-string getPermutationOpt(int n, int k) {
-        vector<int>fac={1,1,2,6,24,120,720,5040,40320,362880};
-        vector<int>nums;
-        for(int i=1;i<=n;i++){
-            nums.push_back(i);
-        }
-        int grp_size;
-        int grp_num;
-        string res;
-        k--;
-        while(n>0){
-            grp_size = fac[n-1];
-            grp_num = k/grp_size;
-            res.push_back('0' + nums[grp_num]);
-            nums.erase(nums.begin()+grp_num);
-            n--;
-            k=k%grp_size;
-        }
-        return res;
-
+string getPermutationOpt(int n, int k)
+{
+    vector<int> fac = {1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880};
+    vector<int> nums;
+    for (int i = 1; i <= n; i++)
+    {
+        nums.push_back(i);
     }
+    int grp_size;
+    int grp_num;
+    string res;
+    k--;
+    while (n > 0)
+    {
+        grp_size = fac[n - 1];
+        grp_num = k / grp_size;
+        res.push_back('0' + nums[grp_num]);
+        nums.erase(nums.begin() + grp_num);
+        n--;
+        k = k % grp_size;
+    }
+    return res;
+}
 int main()
 {
     // Permutations

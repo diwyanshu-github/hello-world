@@ -13,6 +13,17 @@ using namespace std;
 #include <string>
 #include <sstream>
 #include <cmath>
+
+struct ListNode
+{
+    int val;
+    ListNode *next;
+    ListNode() : val(0), next(nullptr) {}
+    // Member Initialization Avoids default construction + reassignment. Directly initializes in memory.
+    ListNode(int x) : val(x), next(nullptr) {}
+    ListNode(int x, ListNode *next) : val(x), next(next) {}
+};
+
 struct TreeNode
 {
     int val;
@@ -3263,6 +3274,2010 @@ int maxAreaOfIsland(vector<vector<int>> &grid)
     }
     return ans;
 }
+
+/*
+// !LC 684 Redundant Connection
+
+Graph was originally a tree (n nodes, n-1 edges).
+One extra edge added → exactly one cycle.
+
+Use Union-Find:
+For each edge (u,v):
+    if find(u) == find(v)
+        → already connected → this edge forms cycle → return it
+    else
+        union(u,v)
+
+Optimizations:
+- Path Compression (find)
+- Union by Rank
+
+findParent → almost O(1) (amortized)
+union → almost O(1)
+
+TC: O(n α(n)) ≈ O(n)
+SC: O(n)
+*/
+
+class DSU
+{
+    vector<int> parent;
+    vector<int> rank;
+
+public:
+    DSU(int n)
+    {
+        rank.assign(n + 1, 0);
+        parent.resize(n + 1);
+        for (int i = 1; i <= n; i++)
+            parent[i] = i;
+    }
+
+    int findParent(int node)
+    {
+        if (parent[node] == node)
+            return node;
+        else
+            return parent[node] = findParent(parent[node]);
+    }
+
+    void unify(int node1, int node2)
+    {
+        int p1 = findParent(node1);
+        int p2 = findParent(node2);
+
+        if (p1 == p2)
+            return;
+
+        if (rank[p1] > rank[p2])
+        {
+            parent[p2] = p1;
+        }
+        else if (rank[p2] > rank[p1])
+        {
+            parent[p1] = p2;
+        }
+        else
+        {
+            parent[p1] = p2;
+            rank[p2]++;
+        }
+    }
+};
+
+class Solution
+{
+public:
+    vector<int> findRedundantConnection(vector<vector<int>> &edges)
+    {
+        DSU d(edges.size() + 1);
+        for (auto &e : edges)
+        {
+            int node1 = e[0];
+            int node2 = e[1];
+
+            if (d.findParent(node1) != d.findParent(node2))
+            {
+                d.unify(node1, node2);
+            }
+            else
+            {
+                return {node1, node2};
+            }
+        }
+        return {};
+    }
+};
+
+/*
+// !LC 1584 Min Cost to Connect Points
+
+Use Prim's algorithm for MST.
+
+Start from node 0.
+Always pick the smallest edge connecting a new node to MST.
+
+Steps:
+1. Use min heap storing (weight, node)
+2. Pop smallest edge
+3. If node not visited:
+       add to MST
+       add cost
+4. Push edges from this node to all other nodes
+
+Edge weight = Manhattan distance.
+
+TC: O(n^2 log n)
+SC: O(n^2)
+*/
+
+int minCostConnectPoints(vector<vector<int>> &points)
+{
+    // no of points == nodes
+    int n = points.size();
+    vector<int> vis(n, 0);
+    priority_queue<pair<int, int>, vector<pair<int, int>>, greater<pair<int, int>>> q; // wt,node
+    q.push({0, 0});
+    int cost = 0;
+    while (!q.empty())
+    {
+        auto [wt, node] = q.top();
+        q.pop();
+        if (vis[node])
+            continue;
+        vis[node] = 1;
+        cost += wt;
+        for (int i = 0; i < n; i++)
+        {
+            if (i == node || vis[i] == 1)
+                continue;
+            //  |xi - xj| + |yi - yj|
+            int currWt = abs(points[node][0] - points[i][0]) + abs(points[node][1] - points[i][1]);
+            q.push({currWt, i});
+        }
+    }
+    return cost;
+}
+
+/*
+// !678. Valid Parenthesis String
+Given a string s containing only three types of characters:
+'(', ')' and '*', return true if s is valid.
+
+
+DP state:
+(i, open) → index and number of unmatched '('
+
+Transitions:
+'(' → open+1
+')' → open-1
+'*' → treat as '(', ')' or empty
+
+Valid if at end open == 0.
+
+// ! Greedy O(n) solution possible
+
+TC: O(n²)
+SC: O(n²)
+*/
+
+bool solve(int i, int open, string &s, vector<vector<int>> &dp)
+{
+    if (open < 0)
+        return false;
+    if (i == s.size())
+        return open == 0;
+    if (dp[i][open] != -1)
+        return dp[i][open];
+    if (s[i] == '(')
+        return dp[i][open] = solve(i + 1, open + 1, s, dp);
+    else if (s[i] == ')')
+        return dp[i][open] = solve(i + 1, open - 1, s, dp);
+    else
+    {
+        return dp[i][open] = solve(i + 1, open + 1, s, dp) ||
+                             solve(i + 1, open - 1, s, dp) ||
+                             solve(i + 1, open, s, dp);
+    }
+}
+bool checkValidString(string s)
+{
+    int n = s.size();
+    // vector<vector<int>> dp(n + 1, vector<int>(n + 1, -1));
+    // return solve(0, 0, s, dp);
+
+    /*
+    Because '*' can be '(', ')' or empty, we cannot track a single open
+    count. Instead we track a range of possible opens: [low, high].
+    '(' increases both, ')' decreases both, '*' expands the range.
+    If high < 0 → too many ')'. At the end low must be 0 to close all '('.
+
+    possible open count
+    [low ........ high]
+    */
+    int low = 0;
+    int high = 0;
+    for (int i = 0; i < n; i++)
+    {
+        if (s[i] == ')')
+        {
+            low--;
+            high--;
+        }
+        else if (s[i] == '(')
+        {
+            low++;
+            high++;
+        }
+        else
+        {
+            low--;  // '*' as ')'
+            high++; // '*' as '('
+        }
+        if (high < 0)
+            return false;
+
+        // we assumed '*' acted like ')'
+        // but there was no '(' to close
+        // So we discard that possibility and treat * as ""  (empty)
+        low = max(low, 0);
+    }
+    return low == 0;
+}
+
+/*
+// !LC 53 Find the maximum sum of a contiguous subarray and print the subarray.
+Test Case: [5, 4, -10, 1]
+OP: 9
+* * INTUITION:
+* We iterate through the array, adding elements to a running 'sum'.
+* 1. If 'sum' exceeds our 'mx', we update the max and "lock in" the
+* current start and end boundaries.
+* 2. If 'sum' drops below 0, it will only decrease the value of any future
+* subarray. So, we reset 'sum' to 0 and move our 'potential_start' to the next index.
+
+* * TIME COMPLEXITY: O(n) - Single pass through the array.
+* SPACE COMPLEXITY: O(1) - Only a few extra variables for tracking.
+*/
+
+int maxSubArray(vector<int> &nums)
+{
+    int mx = INT_MIN, sum = 0;
+    int start = 0, end = 0, temp_start = 0;
+
+    for (int i = 0; i < nums.size(); i++)
+    {
+        sum += nums[i];
+
+        if (sum > mx)
+        {
+            mx = sum;
+            start = temp_start; // Sync the actual start
+            end = i;            // Sync the actual end
+        }
+
+        if (sum < 0)
+        {
+            sum = 0;
+            temp_start = i + 1; // Potential new start
+        }
+    }
+
+    // Print the result subarray
+    for (int i = start; i <= end; i++)
+        cout << nums[i] << " ";
+
+    return mx;
+}
+
+/*
+// !PROBLEM: 152. Maximum Product Subarray
+TC: O(n) | SC: O(1)
+INTUITION:
+Track both max and min products ending at the current index.
+When encountering a negative number, swap max and min.
+At each step, decide to either "restart" at nums[i] or "continue" the product.
+
+SAMPLE TC: nums = [2, 3, -2, 4]
+i=0: max=2, min=2, res=2
+i=1: max=6, min=3, res=6
+i=2: swap(6, 3)->(3, 6) -> max=max(-2, 3*-2)=-2, min=min(-2, 6*-2)=-12, res=6
+i=3: max=max(4, -2*4)=4, min=min(4, -12*4)=-48, res=6
+*/
+int maxProduct(vector<int> &nums)
+{
+    // Initializing with first element handles the single-element array edge case.
+    int res = nums[0];
+    int maxprod = nums[0];
+    int minprod = nums[0];
+
+    for (int i = 1; i < nums.size(); i++)
+    {
+        /* * INTUITION: Multiplying by a negative number flips the signs.
+         * A huge positive becomes a huge negative (the new min).
+         * A huge negative becomes a huge positive (the new max).
+         * Swapping them before calculation accounts for this flip.
+         */
+        if (nums[i] < 0)
+            swap(minprod, maxprod);
+
+        /*
+         * DECISION POINT: At each index, we decide:
+         * 1. Continue the current product (nums[i] * maxprod)
+         * 2. Or start a fresh subarray at the current element (nums[i])
+         * This handles '0's naturally by resetting the product chain.
+         */
+        maxprod = max(nums[i], nums[i] * maxprod);
+        minprod = min(nums[i], nums[i] * minprod);
+
+        // Keep track of the highest value seen ending at ANY index.
+        res = max(res, maxprod);
+    }
+
+    return res;
+    // !to track start and end
+    /*
+    INTUITION:
+    We track the start index for BOTH maxprod and minprod.
+    When we swap the products, we also swap their corresponding start indices.
+    If a product "restarts" at nums[i], we update its start index to i.
+    */
+
+    int n = nums.size();
+    int res = nums[0], maxprod = nums[0], minprod = nums[0];
+    int s = 0, e = 0;
+    int maxStart = 0, minStart = 0; // Track starts for both states
+
+    for (int i = 1; i < n; i++)
+    {
+        if (nums[i] < 0)
+        {
+            swap(maxprod, minprod);
+            swap(maxStart, minStart); // Swap the starting points too!
+        }
+
+        // Update maxprod and its start point
+        if (nums[i] > nums[i] * maxprod)
+        {
+            maxprod = nums[i];
+            maxStart = i; // Restarted here
+        }
+        else
+        {
+            maxprod = nums[i] * maxprod;
+        }
+
+        // Update minprod and its start point
+        if (nums[i] < nums[i] * minprod)
+        {
+            minprod = nums[i];
+            minStart = i; // Restarted here
+        }
+        else
+        {
+            minprod = nums[i] * minprod;
+        }
+
+        if (maxprod > res)
+        {
+            res = maxprod;
+            s = maxStart;
+            e = i;
+        }
+    }
+
+    // Print the result subarray
+    for (int i = s; i <= e; i++)
+        cout << nums[i] << " ";
+    return res;
+}
+/* PROBLEM: 152. Maximum Product Subarray (Two-Pass)
+TC: O(n) | SC: O(1)
+INTUITION:
+An even number of negatives makes the whole array positive.
+An odd number of negatives means we must exclude one negative to get a positive max.
+The max product will either be the prefix (up to the last negative) or
+the suffix (from the first negative). Zeros act as boundaries that reset the product.
+
+SAMPLE TC: nums = [3, -2, -3, -2, 4]
+Forward Pass: 3, -6, 18, -36, -144 (Max: 18)
+Backward Pass: 4, -8, 24, -48, -144 (Max: 24)
+Final Result: 24
+*/
+
+int maxProduct(vector<int> &nums)
+{
+    int n = nums.size();
+    double prefix = 1, suffix = 1;
+    double res = nums[0];
+
+    for (int i = 0; i < n; i++)
+    {
+        // Reset product to 1 if the previous element was 0
+        prefix = (prefix == 0 ? 1 : prefix) * nums[i];
+        suffix = (suffix == 0 ? 1 : suffix) * nums[n - 1 - i];
+
+        res = max({res, prefix, suffix});
+    }
+
+    return (int)res;
+}
+
+/*
+// !PROBLEM: 153. Find Minimum in Rotated Sorted Array
+TC: O(log n) | SC: O(1)
+INTUITION:
+Compare mid with the RIGHTmost element (r).
+The goal is to find the "inflection point" where the numbers drop.
+
+Case 1: nums[mid] > nums[r]
+The right side is "broken." The minimum MUST be to the right of mid.
+Action: l = mid + 1 (mid is too large to be the min).
+
+Case 2: nums[mid] <= nums[r]
+The right side is sorted. The minimum is either mid itself or to its left.
+Action: r = mid (keep mid as a candidate).
+
+CASE 1: mid is on the High Slope (x is between l and Pivot)
+Condition: nums[mid] > nums[r]
+Visual: l ---- x ---- [Pivot] ---- r
+Action: l = mid + 1 (Min is to the right of x)
+
+CASE 2: mid is on the Low Slope (x is between Pivot and r)
+Condition: nums[mid] <= nums[r]
+Visual: l ---- [Pivot] ---- x ---- r
+Action: r = mid (x could be the Pivot, or Pivot is to the left)
+
+CASE 3: mid is EXACTLY at the Pivot
+Condition: nums[mid] <= nums[r] (Specifically, nums[mid] is the smallest)
+Visual: l ---- [x] ---- r
+Action: r = mid (We keep x as the potential answer)
+*/
+
+int findMin(vector<int> &nums)
+{
+    int l = 0, r = nums.size() - 1;
+    while (l < r)
+    {
+        int mid = l + (r - l) / 2;
+        if (nums[mid] > nums[r])
+            l = mid + 1; // Case 1
+        else
+            r = mid; // Case 2 & 3
+    }
+    return nums[r];
+}
+
+/*
+// !PROBLEM: 33. Search in Rotated Sorted Array (Two-Pass)
+TC: O(log n) | SC: O(1)
+INTUITION:
+1. Find the Pivot (s2): Use Binary Search to find the smallest element.
+2. Determine Range:
+   - If target <= nums[n-1], it's on the right slope [s2, n-1].
+   - Else, it's on the left slope [0, s2-1].
+3. Standard Binary Search: Search only within that identified sorted range.
+
+VISUAL:
+    [Slope 1]
+      /
+     /    | [Slope 2]
+   [0]    |    /
+       [s2-1][s2]...[n-1]
+*/
+
+int search(vector<int> &nums, int target)
+{
+    int n = nums.size();
+    int l = 0, r = n - 1;
+
+    // Pass 1: Find the pivot index (s2)
+    while (l < r)
+    {
+        int mid = l + (r - l) / 2;
+        if (nums[mid] > nums[r])
+            l = mid + 1;
+        else
+            r = mid;
+    }
+    int s2 = l;
+
+    // Decide which sorted half to search
+    l = 0;
+    r = n - 1;
+    if (target <= nums[r])
+        l = s2;
+    else
+        r = s2 - 1;
+
+    // Pass 2: Standard Binary Search on the chosen half
+    while (l <= r)
+    {
+        int mid = l + (r - l) / 2;
+        if (nums[mid] == target)
+            return mid;
+        if (nums[mid] > target)
+            r = mid - 1;
+        else
+            l = mid + 1;
+    }
+    return -1;
+}
+
+/* PROBLEM: 150. Evaluate Reverse Polish Notation (Postfix)
+TC: O(N) - Single pass through tokens
+SC: O(N) - Stack stores operands
+
+ALGORITHM:
+1. If token is a NUMBER: Push to stack.
+2. If token is an OPERATOR:
+   a. Pop 'right' operand (top of stack).
+   b. Pop 'left' operand (next on stack).
+   c. Apply operator: (left <op> right).
+   d. Push result back to stack.
+
+VISUAL STACK TRACE ["2", "1", "+", "3", "*"]:
+1. Push 2: [2]
+2. Push 1: [2, 1]
+3. Pop 1, Pop 2 -> (2 + 1) -> Push 3: [3]
+4. Push 3: [3, 3]
+5. Pop 3, Pop 3 -> (3 * 3) -> Push 9: [9]
+Result: 9
+*/
+
+// Helper: Handles basic arithmetic
+int eval(int left, int right, string token)
+{
+    if (token == "+")
+        return left + right;
+    if (token == "-")
+        return left - right;
+    if (token == "*")
+        return left * right;
+    return left / right; // Division
+}
+
+int evalRPN(vector<string> &tokens)
+{
+    stack<int> st;
+    for (const string &token : tokens)
+    {
+        // Check if token is an operator
+        if (token == "+" || token == "-" || token == "*" || token == "/")
+        {
+            int right = st.top();
+            st.pop();
+            int left = st.top();
+            st.pop();
+            st.push(eval(left, right, token));
+        }
+        else
+        {
+            // Convert string to integer and push
+            st.push(stoi(token));
+        }
+    }
+    return st.top();
+}
+
+/**
+ * PROBLEM: Reorder List (L0 -> Ln -> L1 -> Ln-1 -> L2 -> Ln-2 -> ...)
+ *
+ * SAMPLE INPUT:  [1, 2, 3, 4, 5]
+ * SAMPLE OUTPUT: [1, 5, 2, 4, 3]
+ *
+ * COMPLEXITY:
+ * - Time Complexity (TC): O(N)
+ * One pass to find middle, one to reverse half, one to merge.
+ * - Space Complexity (SC): O(1)
+ * In-place pointer manipulation; no extra data structures.
+ *
+ * STRATEGY:
+ * 1. Find Middle: Use slow/fast pointers.
+ * - Even: [1, 2, 3, 4] -> slow at 2
+ * - Odd:  [1, 2, 3, 4, 5] -> slow at 3
+ *
+ * 2. Reverse Second Half: Flip 'next' pointers from (slow->next) to end.
+ * - Initial: [1, 2, 3] and [4, 5]
+ * - Reversed: [1, 2, 3] and [5, 4]
+ *
+ * 3. Split: Crucial to set (slow->next = nullptr) to prevent cycles.
+ *
+ * 4. Merge: Interleave nodes from the first and reversed second half.
+ * - Use temp pointers (tmp1, tmp2) to avoid losing the 'next' node.
+ */
+ListNode *reverse(ListNode *head)
+{
+    ListNode *prev = nullptr;
+    ListNode *curr = head;
+    while (curr)
+    {
+
+        ListNode *next = curr->next;
+        curr->next = prev;
+        prev = curr;
+        curr = next;
+    }
+    return prev;
+}
+void reorderList(ListNode *head)
+{
+    if (!head || !head->next)
+        return;
+
+    // 1. Find Middle
+    ListNode *slow = head, *fast = head;
+    while (fast->next && fast->next->next)
+    {
+        slow = slow->next;
+        fast = fast->next->next;
+    }
+
+    // 2. Reverse Second Half
+    ListNode *second = reverse(slow->next);
+    slow->next = nullptr; // Break the link!
+
+    // 3. Merge
+    ListNode *first = head;
+    while (second)
+    {
+        ListNode *tmp1 = first->next, *tmp2 = second->next;
+        first->next = second;
+        second->next = tmp1;
+        first = tmp1;
+        second = tmp2;
+    }
+}
+
+/*
+//  !PROBLEM: Palindrome Partitioning (LC 131)
+
+ TC (Without DP): O(N * 2^N)
+ 2^N possible partitions * O(N) check per substring.
+
+ TC (With DP/Memo): O(2^N)
+ O(N^2) to precompute/memoize + 2^N partitions * O(1) lookup.
+
+ SC: O(N^2)
+ To store the isPalindrome[i][j] memo table.
+
+ LOGIC:
+ 1. DP: Check if s[i...j] is palindrome via:
+    isPal(i, j) = (s[i] == s[j]) && isPal(i+1, j-1)
+ 2. Backtrack: Try every split point 'j' from 'i'.
+    If s[i...j] is valid, recurse for j+1.
+ 3. Efficiency: Only use s.substr() when pushing to the temp path.
+*/
+class Solution
+{
+    // Declare the memo, but don't give it a fixed size here if you want to be safe
+    vector<vector<int>> memo;
+
+    bool check(int i, int j, string &s)
+    {
+        if (i >= j)
+            return true;
+        if (memo[i][j] != -1)
+            return memo[i][j];
+        if (s[i] != s[j])
+            return memo[i][j] = 0;
+        return memo[i][j] = check(i + 1, j - 1, s);
+    }
+
+    void solve(int i, string &s, vector<string> &temp, vector<vector<string>> &res)
+    {
+        if (i == s.size())
+        {
+            res.push_back(temp);
+            return;
+        }
+        for (int j = i; j < s.size(); j++)
+        {
+            if (check(i, j, s))
+            {
+                temp.push_back(s.substr(i, j - i + 1));
+                solve(j + 1, s, temp, res);
+                temp.pop_back();
+            }
+        }
+    }
+
+public:
+    vector<vector<string>> partition(string s)
+    {
+        int n = s.size();
+        // RESET/RESIZE memo for every new test case
+        memo.assign(n, vector<int>(n, -1));
+
+        vector<string> temp;
+        vector<vector<string>> res;
+        solve(0, s, temp, res);
+        return res;
+    }
+};
+/*
+// !LC 647: Palindromic Substrings (Expand Around Center)
+
+ TC: O(N^2)
+ We iterate through 2N-1 centers (N chars + N-1 gaps).
+ Each expansion takes O(N) in the worst case (e.g., "aaaaa").
+
+ SC: O(1)
+ No DP table or recursion stack; only constant extra variables.
+
+ LOGIC:
+ 1. Every char (odd) and every gap between chars (even) is a potential center.
+ 2. Expand outward from each center as long as s[left] == s[right].
+ 3. Each successful match represents one unique palindromic substring.
+*/
+
+int expand(string &s, int i, int j)
+{
+    int count = 0;
+    while (i >= 0 && j < s.size() && s[i] == s[j])
+    {
+        count++;
+        i--;
+        j++;
+    }
+    return count;
+}
+int countSubstrings(string s)
+{
+    int count = 0;
+    int n = s.size();
+    // memo.assign(n,vector<int>(n,-1));
+    // for(int i=0;i<n;i++){
+    //     for(int j=i;j<n;j++){
+    //         if(check(i,j,s))count++;
+    //     }
+    // }
+    for (int i = 0; i < n; i++)
+    {
+        count += expand(s, i, i);
+        count += expand(s, i, i + 1);
+    }
+    return count;
+}
+
+/**
+// ! LRU Cache - Optimal Design (DLL + HashMap)
+ *
+ * Data Structures:
+ * - list<pair<int,int>> → maintains order (MRU → front, LRU → back)
+ * - unordered_map<int, iterator> → O(1) access to nodes
+ *
+ * Key Operations:
+ * 1. get(key):
+ *    - If not found → return -1
+ *    - Move node to front (most recently used)
+ *
+ * 2. put(key, value):
+ *    - If key exists → remove old node
+ *    - Insert new node at front
+ *    - If size > capacity → remove from back (LRU)
+ *
+ * Important Functions:
+ * - dll.splice() → move node in O(1)
+        * dll.splice(position, source_list, it)
+        * position     → where to insert (iterator in destination list)
+        * source_list  → list from which node is taken (same list here)
+        * it           → iterator pointing to node to move
+        *
+        * Example:
+        * dll.splice(dll.begin(), dll, it);
+        * → moves node at 'it' to front of dll in O(1)
+ * - dll.push_front() → insert MRU
+ * - dll.pop_back() → remove LRU
+ *
+ * Complexity:
+ * - Time: O(1) for both get and put
+ * - Space: O(capacity)
+ *
+ * Why this works:
+ * - HashMap gives direct access to nodes
+ * - DLL maintains usage order
+ * - No duplicates → strict O(1)
+ */
+#include <bits/stdc++.h>
+using namespace std;
+
+class LRUCache
+{
+    int capacity;
+
+    // Doubly Linked List → stores {key, value}
+    // Front = Most Recently Used (MRU)
+    // Back  = Least Recently Used (LRU)
+    list<pair<int, int>> dll;
+
+    // HashMap → key -> iterator to node in DLL
+    unordered_map<int, list<pair<int, int>>::iterator> m;
+
+public:
+    LRUCache(int capacity)
+    {
+        this->capacity = capacity;
+    }
+
+    int get(int key)
+    {
+        // If key not present → return -1
+        auto it = m.find(key);
+        if (it == m.end())
+            return -1;
+
+        // Get node from DLL
+        auto node = it->second;
+        int value = node->second;
+
+        // Move accessed node to front (MRU)
+        dll.splice(dll.begin(), dll, node);
+
+        // Update iterator in map (good practice)
+        m[key] = dll.begin();
+
+        return value;
+    }
+
+    void put(int key, int value)
+    {
+        // Edge case: capacity = 0
+        if (capacity == 0)
+            return;
+
+        auto it = m.find(key);
+
+        // If key already exists → remove old node
+        if (it != m.end())
+        {
+            dll.erase(it->second);
+            m.erase(it);
+        }
+
+        // Insert new node at front (MRU)
+        dll.push_front({key, value});
+        m.emplace(key, dll.begin());
+
+        // If capacity exceeded → remove LRU (back)
+        if (m.size() > capacity)
+        {
+            auto [k, v] = dll.back();
+            dll.pop_back();
+            m.erase(k);
+        }
+    }
+};
+/*
+// !LC 139: Word Break (Trie + Memoization)
+
+ TC: O(N^2 + W*L)
+ - W*L to build the Trie (W = number of words, L = avg length).
+ - N^2 for the DP: There are N states in 'memo', and for each state,
+   we potentially iterate through the remaining string (N).
+
+ SC: O(W*L + N)
+ - W*L space to store the Trie nodes.
+ - O(N) for the memoization table and recursion stack.
+
+ LOGIC:
+ 1. Insert all dictionary words into a Trie for O(WordLen) prefix matching.
+ 2. Use recursion with memoization to check if s[i...n] can be partitioned.
+ 3. At each index 'i', walk down the Trie. Whenever we hit an 'isEnd' node:
+    - It means s[i...j] is a valid word.
+    - Recurse on the remaining suffix solve(j + 1).
+ 4. Use memo[i] to skip re-calculating suffixes we've already checked.
+*/
+// class Trie
+// {
+// public:
+//     struct TrieNode
+//     {
+//         TrieNode *links[26] = {nullptr};
+//         bool isEnd = false;
+
+//         bool contains(char c) { return links[c - 'a'] != nullptr; }
+//         void put(char c) { links[c - 'a'] = new TrieNode(); }
+//         TrieNode *get(char c) { return links[c - 'a']; }
+//         void setEnd() { isEnd = true; }
+//         bool hasEnded() { return isEnd; }
+//     };
+
+//     TrieNode *root;
+//     Trie() { root = new TrieNode(); }
+
+//     void addWord(const string &word)
+//     {
+//         TrieNode *node = root;
+//         for (char c : word)
+//         {
+//             if (!node->contains(c))
+//                 node->put(c);
+//             node = node->get(c);
+//         }
+//         node->setEnd();
+//     }
+
+//     TrieNode *getRoot() { return root; }
+// };
+
+class Solution
+{
+public:
+    bool solve(int i, string &s, Trie::TrieNode *root, vector<int> &memo)
+    {
+        // Base case: reached the end of the string
+        if (i == s.size())
+            return true;
+
+        // Return cached result (0 = false, 1 = true)
+        if (memo[i] != -1)
+            return memo[i];
+
+        Trie::TrieNode *curr = root;
+        for (int j = i; j < s.size(); j++)
+        {
+            // If the character isn't in the Trie, no more words can start with this prefix
+            if (!curr->contains(s[j]))
+                break;
+
+            curr = curr->get(s[j]);
+
+            // If we find a valid word, try to solve for the remaining suffix
+            // if (curr->hasEnded()) // commenting for vs code error same trie class twice
+            {
+                if (solve(j + 1, s, root, memo))
+                {
+                    return memo[i] = 1;
+                }
+            }
+        }
+
+        return memo[i] = 0;
+    }
+
+    bool wordBreak(string s, vector<string> &wordDict)
+    {
+        Trie myTrie;
+        for (const string &word : wordDict)
+        {
+            myTrie.addWord(word);
+        }
+
+        // Using s.size() for the memo table size
+        vector<int> memo(s.size(), -1);
+        // return solve(0, s, myTrie.getRoot(), memo);
+    }
+};
+
+/*
+// !CLONE GRAPH — NOTES
+
+Optimal Approach (BFS/DFS):
+- Use unordered_map<Node*, Node*> → original → clone
+- Traverse graph once (BFS/DFS)
+- For each node:
+    - if neighbor not in map → create clone + push to queue
+    - always connect: clone[curr]->neighbors.push_back(clone[nei])
+
+Key Ideas:
+- Map acts as both → visited + cloned
+- Clone graph "on the fly" (no need to rebuild)
+
+Why not use val?
+- Node values may not be unique
+- Always use Node* as identity
+
+Complexity:
+- Time: O(V + E)
+- Space: O(V)
+
+Common Mistakes:
+- Forgetting to connect edges after creating node
+- Using val instead of pointer
+- Doing 2-pass (build adj + rebuild graph) → unnecessary
+*/
+class Node
+{
+public:
+    int val;
+    vector<Node *> neighbors;
+    Node()
+    {
+        val = 0;
+        neighbors = vector<Node *>();
+    }
+    Node(int _val)
+    {
+        val = _val;
+        neighbors = vector<Node *>();
+    }
+    Node(int _val, vector<Node *> _neighbors)
+    {
+        val = _val;
+        neighbors = _neighbors;
+    }
+};
+Node *cloneGraph(Node *node)
+{
+    if (!node)
+        return nullptr;
+    unordered_map<Node *, Node *> m; // clone and visited
+    queue<Node *> q;
+    q.push(node);
+    m[node] = new Node(node->val);
+    while (!q.empty())
+    {
+        Node *curr = q.front();
+        q.pop();
+        for (auto nei : curr->neighbors)
+        {
+            if (!m.count(nei))
+            { // means not visited
+                m[nei] = new Node(nei->val);
+                q.push(nei);
+            }
+            m[curr]->neighbors.push_back(m[nei]);
+        }
+    }
+    return m[node];
+}
+
+/*
+Problem: 128. Longest Consecutive Sequence
+Time Complexity: O(n) (Amortized)
+- O(n) to build the hash set for O(1) lookups.
+- O(n) for the outer loop to identify sequence "starters".
+- O(n) total across all 'while' loops because each number in a
+trail is visited exactly once in the entire program.
+- Total: O(n) + O(n) + O(n) = O(3n) -> O(n).
+
+Only start from numbers which are sequence START
+i.e., num-1 does NOT exist
+This avoids re-counting sequences again and again
+
+Space Complexity: O(n)
+- Required to store all unique elements in the unordered_set.
+Efficiency Example:
+- Given a trail [1, 2, 3, 4]:
+- When i = 1: (1-1=0) is not in set. While loop runs for 2, 3, 4.
+- When i = 2: (2-1=1) IS in set. Skip while loop.
+- When i = 3: (3-1=2) IS in set. Skip while loop.
+- When i = 4: (4-1=3) IS in set. Skip while loop.
+- Result: The entire trail is iterated only once by the 'starter' (1).
+- All trails in nums are effectively processed once by the while loop.
+*/
+
+int longestConsecutive(vector<int> &nums)
+{
+    unordered_set<int> s;
+    for (int num : nums)
+        s.insert(num);
+
+    int res = 0;
+    for (int num : s)
+    {
+        if (!s.count(num - 1))
+        {
+            int currTrail = 1;
+            int curr = num;
+            while (s.count(curr + 1))
+            {
+                currTrail++;
+                curr = curr + 1;
+            }
+            res = max(res, currTrail);
+        }
+    }
+    return res;
+}
+/**
+// !GAS STATION (LC 134) - GREEDY
+ *
+ * Key Ideas:
+ * 1. If total gas < total cost → impossible → return -1
+ * 2. Traverse once, keep current tank
+ * 3. If tank becomes negative at i:
+ *      → cannot start from any index ≤ i
+ *      → reset start = i+1 and tank = 0
+ * 4. Final start is answer (if total >= 0)
+ *
+ * Why greedy works:
+ * - If we fail at i, any start before i will also fail
+ * - So we skip all those and jump directly to i+1
+ *
+ * Complexity:
+ * - Time: O(n)
+ * - Space: O(1)
+ */
+
+int canCompleteCircuit(vector<int> &gas, vector<int> &cost)
+{
+
+    int totalNet = 0;
+    int start = 0;
+    int currFuel = 0;
+    for (int i = 0; i < cost.size(); i++)
+    {
+        int currNet = gas[i] - cost[i];
+        totalNet += currNet;
+        currFuel += currNet;
+        if (currFuel < 0)
+        { // means started from wrong station
+            start = i + 1;
+            currFuel = 0;
+        }
+    }
+    return totalNet < 0 ? -1 : start;
+}
+/**
+// !WORD LADDER (LC 127) - OPTIMAL BFS
+ *
+ * Idea:
+ * - Use BFS from beginWord → shortest path
+ * - Instead of building graph (O(n²)), generate neighbors on the fly
+ *
+ * Approach:
+ * - Put all words in unordered_set for O(1) lookup
+ * - For each word:
+ *     try changing each character (a → z)
+ *     if new word exists in set:
+ *         push to queue + remove from set (mark visited)
+ *
+ * Key Points:
+ * - BFS ensures shortest transformation
+ * - Erasing from set prevents revisiting
+ * - No need for explicit visited map
+ *
+ * Complexity:
+ * - Time:  O(n * L * 26) ≈ O(n * L)
+ * - Space: O(n)
+ *
+ * Insight:
+ * - Generate neighbors instead of comparing all pairs
+ */
+
+/**
+ * PSEUDO + COMPLEXITY
+ *
+ * 1. Build adjacency list (graph)
+ *    for i = 0 → n:
+ *      for j = i+1 → n:
+ *        if isValid(word[i], word[j]) → O(L)
+ *           connect both
+ *
+ *    Time: O(n² * L)
+ *
+ * 2. Connect beginWord with all valid words
+ *    loop over wordList:
+ *      isValid(beginWord, word) → O(L)
+ *
+ *    Time: O(n * L)
+ *
+ * 3. BFS traversal
+ *    push beginWord
+ *    while queue:
+ *      process level
+ *      for each neighbor:
+ *         visit once
+ *
+ *    Time: O(n²) (edges in worst case)
+ *
+ * --------------------------------------------------
+ * FINAL TIME: O(n² * L)
+ * SPACE: O(n²) (adjacency list) + O(n) (queue, visited)
+ * --------------------------------------------------
+ */
+int ladderLength(string beginWord, string endWord, vector<string> &wordList)
+{
+    unordered_set<string> s(wordList.begin(), wordList.end());
+    if (!s.count(endWord))
+        return 0;
+    queue<string> q;
+    q.push(beginWord);
+    int l = 0;
+    while (!q.empty())
+    {
+        l++;
+        int n = q.size();
+        for (int i = 0; i < n; i++)
+        {
+            string word = q.front();
+            q.pop();
+            if (word == endWord)
+                return l;
+            for (int j = 0; j < word.size(); j++)
+            {
+                char c = word[j];
+                for (char k = 'a'; k <= 'z'; k++)
+                {
+                    if (k == c)
+                        continue;
+                    word[j] = k;
+                    if (s.count(word))
+                    {
+                        q.push(word);
+                        s.erase(word);
+                    }
+                }
+                word[j] = c;
+            }
+        }
+    }
+    return 0;
+}
+/**
+// !Max Path Sum in Binary Tree
+ *
+ * - Use DFS (postorder)
+ * - At each node:
+ *     compute left and right gains
+ *     ignore negatives (take 0)
+ *
+ * - Update global max with:
+ *     left + right + root
+ *
+ * - Return to parent:
+ *     root + max(left, right)
+ *
+ * Time: O(n)
+ * Space: O(h)
+ */
+int solve(TreeNode *root, int &mx)
+{
+    if (!root)
+        return 0;
+    int lsum = solve(root->left, mx);
+    int rsum = solve(root->right, mx);
+    mx = max(mx, lsum + rsum + root->val);
+    return max(max(lsum, rsum) + root->val, 0);
+}
+int maxPathSum(TreeNode *root)
+{
+    // at a node, l sum + r sum + node
+    int mx = INT_MIN;
+    solve(root, mx);
+    return mx;
+}
+
+/*
+PROBLEM: Count distinct subsequences of s that equal t
+
+IDEA:
+- At each index i in s, we have 2 choices:
+    1) Take s[i] (only if s[i] == t[j])
+    2) Skip s[i]
+- This forms a classic pick / not-pick recursion
+
+STATE:
+- dp[i][j] = number of ways to form t[0..j] using s[0..i]
+
+TRANSITION:
+- If s[i] == t[j]:
+    dp[i][j] = dp[i-1][j-1] (take) + dp[i-1][j] (skip)
+- Else:
+    dp[i][j] = dp[i-1][j] (skip only)
+
+BASE CASES:
+- j < 0 → t is fully formed → return 1
+- i < 0 → s खत्म but t left → return 0
+
+ANSWER:
+- solve(n-1, m-1)
+
+COMPLEXITY:
+- Time: O(n * m)
+- Space: O(n * m) (can optimize to O(m))
+
+EDGE CASES:
+- t == "" → always 1
+- s == "" → 0 if t not empty
+- repeated chars → multiple combinations
+
+INTUITION (1 line):
+- Count all ways to match t as a subsequence in s using include/exclude.
+*/
+class Solution
+{
+public:
+    /*
+    dp[i][j] = number of ways to form t[0..j] using s[0..i]
+    */
+
+    int solve(int i, int j, string &s, string &t, vector<vector<int>> &dp)
+    {
+
+        // ✅ If t is fully formed
+        if (j < 0)
+            return 1;
+
+        // ❌ If s खत्म but t still left
+        if (i < 0)
+            return 0;
+
+        if (dp[i][j] != -1)
+            return dp[i][j];
+
+        // If characters match → 2 choices
+        if (s[i] == t[j])
+        {
+            int take = solve(i - 1, j - 1, s, t, dp); // match both
+            int skip = solve(i - 1, j, s, t, dp);     // skip s[i]
+            return dp[i][j] = take + skip;
+        }
+
+        // If not match → only skip s[i]
+        return dp[i][j] = solve(i - 1, j, s, t, dp);
+    }
+
+    int numDistinct(string s, string t)
+    {
+        int n = s.size(), m = t.size();
+        vector<vector<int>> dp(n, vector<int>(m, -1));
+        return solve(n - 1, m - 1, s, t, dp);
+    }
+};
+
+/*
+// !LC 621 - Task Scheduler
+
+INTUITION:
+- Always run the most frequent task (maxHeap)
+- After running → it goes into cooldown (queue)
+- If no task available → jump time to next available task
+
+WE STORE:
+- queue: {remaining_freq, unavailable_till_time}
+
+PSEUDO:
+
+build freq map → push into maxHeap
+
+curr_time = 0
+
+while (heap not empty OR queue not empty):
+
+    // ⏩ if nothing to execute, jump time
+    if (heap empty AND queue not empty):
+        curr_time = queue.front().time + 1
+
+    // release all tasks whose cooldown finished
+    while (queue not empty AND queue.front().time < curr_time):
+        move back to heap
+
+    // execute best task
+    if (heap not empty):
+        freq = heap.pop()
+
+        if (freq - 1 > 0):
+            queue.push({freq-1, curr_time + n})  // unavailable till this time
+
+    curr_time++
+
+return curr_time
+
+COMPLEXITY:
+- Time: O(T log 26) ~ O(T)
+- Space: O(26)
+
+KEY POINTS:
+- storing "unavailable till time"
+- next usable time = t + 1
+- so release when: t < curr_time
+- cooldown push = curr_time + n
+- time jump avoids idle simulation
+*/
+int leastInterval(vector<char> &tasks, int n)
+{
+    priority_queue<int> heap; // freq
+    queue<pair<int, int>> q;  // freq, unavailable_till_time
+
+    unordered_map<char, int> freqMap; // task freq
+    for (char c : tasks)
+    {
+        freqMap[c]++;
+    }
+    for (auto it : freqMap)
+    {
+        char c = it.first;
+        int freq = it.second;
+        heap.push(freq);
+    }
+
+    int curr_time = 0;
+    while (!heap.empty() || !q.empty())
+    {
+        if (heap.empty() && !q.empty())
+            curr_time = max(curr_time, q.front().second + 1);
+        if (!q.empty() && q.front().second < curr_time)
+        {
+            // if curr_time > unavailable till time, task can be done
+            auto [freq, unavailable_time] = q.front();
+            q.pop();
+            heap.push(freq);
+        }
+        if (!heap.empty())
+        { // some task can be done now
+            int freq = heap.top();
+            heap.pop();
+            if (freq - 1 > 0)
+                q.push({freq - 1, curr_time + n});
+        }
+        curr_time++;
+    }
+    return curr_time;
+}
+/*
+LC 621 - Task Scheduler
+
+--------------------------------------------------
+CORE INTUITION:
+- Most frequent task = bottleneck
+- Place it first → creates forced gaps
+- Remaining tasks try to fill those gaps
+
+--------------------------------------------------
+FORMULA DERIVATION (STEP-BY-STEP):
+
+Suppose:
+maxFreq = frequency of most frequent task
+
+Example:
+A A A   (maxFreq = 3, n = 2)
+
+We must separate them:
+A _ _ A _ _ A
+
+Think in blocks:
+(A _ _) (A _ _) (A)
+
+--------------------------------------------------
+STEP 1: Number of blocks
+- We have (maxFreq - 1) full gaps between tasks
+
+blocks = maxFreq - 1
+
+--------------------------------------------------
+STEP 2: Size of each block
+- Each gap must have at least n spaces
+- Plus 1 position for the task itself
+
+block size = (n + 1)
+
+--------------------------------------------------
+STEP 3: Base structure length
+
+(min length without last block)
+= (maxFreq - 1) * (n + 1)
+
+--------------------------------------------------
+STEP 4: Add last block
+
+If multiple tasks have maxFreq:
+
+Example:
+A A A
+B B B
+
+Last block = A B  → size = countMax
+
+So:
++ countMax
+
+--------------------------------------------------
+FINAL FORMULA:
+
+min_required_length =
+    (maxFreq - 1)*(n + 1) + countMax
+
+--------------------------------------------------
+WHY max(total, formula)?
+
+Case 1:
+remaining tasks ≥ gaps
+→ they fill all empty slots
+→ no idle needed
+→ answer = total
+
+Case 2:
+remaining tasks < gaps
+→ some slots remain empty
+→ idle needed
+→ answer = formula
+
+--------------------------------------------------
+FINAL ANSWER:
+
+ans = max(total, (maxFreq - 1)*(n + 1) + countMax)
+
+--------------------------------------------------
+KEY INSIGHT:
+- Formula gives MINIMUM required schedule length
+- total gives ACTUAL tasks count
+- answer = whichever is larger
+
+--------------------------------------------------
+ONE-LINE MEMORY TRICK:
+- "(blocks × block_size) + last_block"
+*/
+int leastInterval(vector<char> &tasks, int n)
+{
+
+    unordered_map<char, int> m;
+    for (char c : tasks)
+        m[c]++;
+    int maxFreq = 0;
+    for (auto it : m)
+    {
+        maxFreq = max(maxFreq, it.second);
+    }
+
+    int countMax = 0;
+    for (auto i : m)
+    {
+        if (i.second == maxFreq)
+            countMax++;
+    }
+    return max((int)tasks.size(), (maxFreq - 1) * (n + 1) + countMax);
+}
+/*
+// !======================= GROUP ANAGRAMS - 3 APPROACHES ========================
+
+Anagrams = strings having same characters with same frequency.
+Example:
+"eat", "tea", "ate" are anagrams.
+
+-------------------------------------------------------------------------------
+APPROACH 1: SORTING + HASHMAP OF VECTORS
+-------------------------------------------------------------------------------
+Idea:
+Sort every string and use sorted string as key.
+
+Example:
+"eat" -> "aet"
+"tea" -> "aet"
+"ate" -> "aet"
+
+So all strings with same sorted form go in same group.
+
+Code idea:
+unordered_map<string, vector<string>> groups;
+
+for each string s:
+    key = sorted(s)
+    groups[key].push_back(s)
+
+Then collect all map values into result.
+
+Time:
+- sorting each string = O(k log k)
+- total = O(n * k log k)
+
+Space:
+- O(n * k)
+
+Pros:
+- simplest and most standard
+- easiest to explain and write
+
+Cons:
+- sorting makes it slower than frequency approach
+
+-------------------------------------------------------------------------------
+APPROACH 2: SORTING + HASHMAP OF INDEX
+-------------------------------------------------------------------------------
+Idea:
+Same sorted key as approach 1,
+but instead of storing vector in map,
+store index of that group inside result.
+
+This avoids a second loop over hashmap.
+
+Example:
+m["aet"] = 0   -> res[0] stores all anagrams of "aet"
+m["ant"] = 1   -> res[1] stores all anagrams of "ant"
+
+Code idea:
+unordered_map<string, int> m;
+vector<vector<string>> res;
+
+for each string s:
+    key = sorted(s)
+
+    if key not present:
+        m[key] = res.size()
+        res.push_back({})
+
+    res[m[key]].push_back(s)
+
+Time:
+- sorting each string = O(k log k)
+- total = O(n * k log k)
+
+Space:
+- O(n * k)
+
+Pros:
+- slightly cleaner / more optimized than approach 1
+- builds answer directly in one pass
+
+Cons:
+- still uses sorting
+
+-------------------------------------------------------------------------------
+APPROACH 3: FREQUENCY COUNT KEY (OPTIMIZED)
+-------------------------------------------------------------------------------
+Idea:
+Instead of sorting string,
+count frequency of characters and build a unique key.
+
+Because two strings are anagrams iff
+all 26 character counts are same.
+
+Possible key styles:
+
+1) Full frequency key:
+   "eat" -> "#1#0#0#0#1...#1..."
+   (safe and common)
+
+2) Compact key:
+   "eat" -> "a1e1t1"
+   "tea" -> "a1e1t1"
+
+Code idea:
+count freq[26]
+build key using freq
+use hashmap to group strings
+
+Time:
+- counting chars = O(k)
+- building key = O(26)
+- total = O(n * k)
+
+Space:
+- O(n * k)
+
+Pros:
+- best time complexity
+- better than sorting approach
+- interview standout optimization
+
+Cons:
+- slightly less intuitive than sorting
+- key construction must be done carefully
+
+-------------------------------------------------------------------------------
+WHICH ONE TO USE?
+-------------------------------------------------------------------------------
+1) If interviewer wants clean/simple:
+   -> use SORTING approach
+
+2) If you want slightly better implementation:
+   -> use SORTING + INDEX approach
+
+3) If interviewer asks optimization / better than sorting:
+   -> use FREQUENCY KEY approach
+
+-------------------------------------------------------------------------------
+INTERVIEW ONE-LINER
+-------------------------------------------------------------------------------
+"Sorting solution is standard O(n * k log k),
+but we can optimize to O(n * k) by using
+character frequency as a unique key."
+
+===============================================================================
+*/
+
+/*
+------------------ APPROACH 1: SORTING + HASHMAP OF VECTORS ------------------
+
+Use sorted string as key.
+All anagrams become same after sorting.
+
+Example:
+"eat", "tea", "ate" -> "aet"
+
+Time: O(n * k log k)
+Space: O(n * k)
+*/
+
+vector<vector<string>> groupAnagrams1(vector<string> &strs)
+{
+    unordered_map<string, vector<string>> groups;
+
+    for (string &s : strs)
+    {
+        string key = s;
+        sort(key.begin(), key.end());
+        groups[key].push_back(s);
+    }
+
+    vector<vector<string>> res;
+    for (auto &it : groups)
+    {
+        res.push_back(it.second);
+    }
+
+    return res;
+}
+
+/*
+------------------- APPROACH 2: SORTING + HASHMAP OF INDEX -------------------
+
+Use sorted string as key.
+Instead of storing vector in hashmap,
+store index of group in result.
+
+This avoids extra traversal of hashmap.
+
+Time: O(n * k log k)
+Space: O(n * k)
+*/
+
+vector<vector<string>> groupAnagrams2(vector<string> &strs)
+{
+    unordered_map<string, int> m;
+    vector<vector<string>> res;
+
+    for (string &s : strs)
+    {
+        string key = s;
+        sort(key.begin(), key.end());
+
+        if (!m.count(key))
+        {
+            m[key] = res.size();
+            res.emplace_back();
+        }
+
+        res[m[key]].push_back(s);
+    }
+
+    return res;
+}
+
+/*
+-------------------- APPROACH 3: FREQUENCY KEY (OPTIMIZED) -------------------
+
+Instead of sorting, count character frequencies.
+
+Build compact key like:
+"eat" -> "a1e1t1"
+"tea" -> "a1e1t1"
+
+All anagrams produce same frequency key.
+
+Time: O(n * k)
+Space: O(n * k)
+*/
+
+string makeKey(string &s)
+{
+    int freq[26] = {0};
+
+    for (char c : s)
+    {
+        freq[c - 'a']++;
+    }
+
+    string key = "";
+    for (int i = 0; i < 26; i++)
+    {
+        if (freq[i] > 0)
+        {
+            key += char(i + 'a');      // actual character
+            key += to_string(freq[i]); // its frequency
+        }
+    }
+
+    return key;
+}
+
+vector<vector<string>> groupAnagrams3(vector<string> &strs)
+{
+    unordered_map<string, int> m;
+    vector<vector<string>> res;
+
+    for (string &s : strs)
+    {
+        string key = makeKey(s);
+
+        if (!m.count(key))
+        {
+            m[key] = res.size();
+            res.emplace_back();
+        }
+
+        res[m[key]].push_back(s);
+    }
+
+    return res;
+}
+
+/*
+PROBLEM: Interleaving string
+Check if s3 is formed by interleaving s1 and s2.
+Order of characters in s1 and s2 must be preserved.
+State:
+solve(i, j) = can we form s3 from s1[i...] and s2[j...] ?
+
+At any step, next needed char in s3 is at index (i + j),
+because we already used i chars from s1 and j chars from s2.
+
+Try:
+1) take s1[i] if it matches s3[i+j]
+2) take s2[j] if it matches s3[i+j]
+
+Use DP to avoid recomputing same (i, j) state.
+TIME COMPLEXITY:
+O(m * n)
+
+Each state (i, j) computed once
+
+-----------------------------------------------------------------------
+SPACE COMPLEXITY:
+O(m * n)  (DP table + recursion stack)
+
+-----------------------------------------------------------------------
+COMMON MISTAKES:
+1) Building string (curr) → unnecessary & slow ❌
+2) Not using i + j for s3 index ❌
+3) Wrong base case ❌
+4) Not checking length mismatch ❌
+5) DP size (m x n) instead of (m+1 x n+1) ⚠️
+
+-----------------------------------------------------------------------
+INTERVIEW ONE-LINER:
+"At each step, we match s3[i+j] with either s1[i] or s2[j],
+and use DP on (i, j) to avoid recomputation."
+
+*/
+
+bool solve(int i, int j, string &s1, string &s2, string &s3, vector<vector<int>> &dp)
+{
+    if (i == s1.size() && j == s2.size())
+        return true;
+    // if(i == s1.size()){
+    //     while(j < s2.size()){
+    //         if(s3[i+j] != s2[j++]) return false;
+    //     }
+    //     return true;;
+    // }
+    // if(j == s2.size()){
+    //     while(i<s1.size()){
+    //         if(s3[i+j] != s1[i++]) return false;
+    //     }
+    //     return true;
+    // }
+    if (dp[i][j] != -1)
+        return dp[i][j];
+
+    bool op1 = false;
+    bool op2 = false;
+    if (i < s1.size() && s1[i] == s3[i + j])
+        op1 = solve(i + 1, j, s1, s2, s3, dp);
+    if (j < s2.size() && s2[j] == s3[i + j])
+        op2 = solve(i, j + 1, s1, s2, s3, dp);
+
+    return dp[i][j] = (op1 || op2) ? 1 : 0;
+}
+bool isInterleave(string s1, string s2, string s3)
+{
+    int m = s1.size();
+    int n = s2.size();
+    if (m + n != s3.size())
+        return false;
+    vector<vector<int>> dp(m + 1, vector<int>(n + 1, -1));
+    return solve(0, 0, s1, s2, s3, dp);
+}
+
+/*
+// !====================== 91. DECODE WAYS - CPP NOTES ======================
+
+PROBLEM:
+Given a string of digits, count number of ways to decode it.
+Mapping: '1'->'A', ..., '26'->'Z'
+
+At each index:
+1) Take one digit if current char is not '0'
+2) Take two digits if formed number is between 10 and 26
+
+Use DP[i] = number of ways to decode string starting from index i.
+
+TIME COMPLEXITY:
+O(n) Each index computed once
+
+SPACE COMPLEXITY:
+O(n)
+
+*/
+
+int solve(int i, string &s, vector<int> &dp)
+{
+    if (i >= s.size())
+        return 1;
+    if (s[i] == '0')
+        return 0;
+    // // 10,20 valid rest 00 30 40 50 ... invalid
+    // if(s[i] == '0' && i-1 >= 0 && (s[i-1] > '2' || s[i-1] == '0')) {
+    //     // cout<<s[i-1]<<" "<<s[i]<<" ";
+    //     return 0;
+    // }
+    if (dp[i] != -1)
+        return dp[i];
+    int single = solve(i + 1, s, dp);
+    int notSingle = 0;
+    if (s[i] == '1' && i + 1 < s.size())
+        notSingle = solve(i + 2, s, dp);
+    if (s[i] == '2' && i + 1 < s.size() && s[i + 1] <= '6')
+        notSingle = solve(i + 2, s, dp);
+
+    return dp[i] = single + notSingle;
+}
+int numDecodings(string s)
+{
+    // leading zeros
+    //  if(s[0] == '0') return 0;
+    vector<int> dp(s.size(), -1);
+    return solve(0, s, dp);
+}
+
+// !Detect Squares
+/*
+
+Intuition (short)
+
+For query point (x, y):
+    choose another point (x, y1) on same vertical line
+    now side length = |y1 - y|
+    possible square can be:
+    right side → x + d
+    left side → x - d
+    multiply frequencies of all 3 needed points
+
+Algo:
+
+Store freq of each point as m[x][y].
+
+For query point (x,y):
+- Pick every other point (x,y1) on same vertical line.
+- Side length = abs(y1-y).
+- Try making square on:
+    1) right side -> x + d
+    2) left side  -> x - d
+- Add product of frequencies of the 3 required points.
+
+Time:
+- add()   -> O(1) avg
+- count() -> O(number of distinct y on same x), worst O(n)
+
+Space:
+- O(total distinct points)
+
+*/
+class DetectSquares
+{
+    unordered_map<int, unordered_map<int, int>> m; // x,y,freq
+public:
+    DetectSquares() {}
+
+    void add(vector<int> point)
+    {
+        int x = point[0];
+        int y = point[1];
+        m[x][y]++;
+    }
+
+    int count(vector<int> point)
+    {
+        int currx = point[0];
+        int curry = point[1];
+
+        int count = 0;
+        for (auto &[nexty, freq] : m[currx])
+        {
+            // all points having same x
+            int d = abs(nexty - curry);
+            if (d == 0)
+                continue; // skip same point
+
+            // pair of points formed
+            // p1: {currx,curry} and p2: {currx,nexty}
+            // i need two more points to form a square
+            // at last count = f2*f3*f4; (product of all freq except {currx,curry})
+
+            // square 1:  p3: currx + d, curry
+            //            p4: currx + d, nexty
+
+            // square 2:  p3: currx - d,curry
+            //            p4: currx - d, nexty
+
+            count += freq * m[currx + d][curry] * m[currx + d][nexty];
+            count += freq * m[currx - d][curry] * m[currx - d][nexty];
+        }
+        return count;
+    }
+};
 
 // ! ==========
 
