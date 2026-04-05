@@ -5278,7 +5278,1130 @@ public:
         return count;
     }
 };
+/*
+// !84. Largest Rectangle in Histogram
+INTUITION:
+Every bar wants to become the rectangle height.
 
+For each bar i:
+area = heights[i] * width
+
+To get max width for this height,
+find:
+1) NSL = index of next smaller element on left
+2) NSR = index of next smaller element on right
+
+Then:
+width = NSR - NSL - 1
+
+WHY MONOTONIC STACK?
+A smaller bar tells where current bar's rectangle must stop.
+Use increasing stack to find first smaller on both sides in O(n).
+
+IMPORTANT:
+Use '<' or '<=' carefully.
+- '<'  -> equal heights stay separate (still works)
+- '<=' -> equal heights merge earlier (more standard)
+
+TIME:  O(n)
+SPACE: O(n)
+// ! two methods:
+! 1. maintain nextSmallerRight and nextSmallerLeft arrays
+! 2. second method: arrays not required
+Increasing stack of indices.
+
+When current height is smaller than stack top:
+- current i becomes NSR
+- new stack top becomes NSL
+- compute area for popped bar
+
+Run till i = n with currHeight = 0
+to force all remaining bars to be processed.
+
+Time: O(n), Space: O(n)
+*/
+int largestRectangleArea(vector<int> &heights)
+{
+    /*
+    Every bar wants to be the rectangle height.
+    area = ht * width
+    width = index(nextSmallerOnRight) - index(nextSmallerOnLeft) - 1;
+    */
+    int n = heights.size();
+    // stack<pair<int, int>> st; // val, index
+    // vector<int> nsl(n, -1);
+    // for (int i = n - 1; i >= 0; i--) {
+    //     while (!st.empty() && heights[i] < st.top().first) {
+    //         // if h[i] smaller it can pop
+    //         nsl[st.top().second] = i;
+    //         st.pop();
+    //     }
+    //     st.push({heights[i],i});
+    // }
+
+    // stack<pair<int,int>>empty;
+    // st.swap(empty);
+
+    // vector<int>nsr(n,n);
+    stack<int> st;
+    int area = 0;
+    for (int i = 0; i <= n; i++)
+    {
+        // while (!st.empty() && heights[i] < st.top().first) {
+        //     // if h[i] smaller it can pop
+        //     nsr[st.top().second] = i;
+        //     st.pop();
+        // }
+        // st.push({heights[i],i});
+
+        int currHeight = (i == n) ? 0 : heights[i];
+        while (!st.empty() && currHeight < heights[st.top()])
+        {
+            // for st.top() current ele is nsr
+            // element just below is nsl
+            // calculate area for this element
+            int ht = heights[st.top()];
+            st.pop();
+            int nsr = i;
+            int nsl = (st.empty()) ? -1 : st.top();
+            int width = nsr - nsl - 1;
+            area = max(area, ht * width);
+        }
+        st.push(i);
+    }
+    return area;
+
+    // int res=0;
+    // for(int i=0;i<n;i++){
+    //     int width = nsr[i]-nsl[i] - 1;
+    //     int area = heights[i] * width;
+    //     res=max(res,area);
+    // }
+    // return res;
+}
+/*
+========================================================
+// !LC 567. Permutation in String
+========================================================
+
+PROBLEM:
+Given two strings s1 and s2,
+return true if s2 contains a substring that is a permutation of s1,
+otherwise return false.
+
+A permutation means:
+same characters + same frequency, but order can be different.
+
+--------------------------------------------------------
+SAMPLE INPUT / OUTPUT
+--------------------------------------------------------
+
+Input:
+s1 = "ab"
+s2 = "eidbaooo"
+
+Output:
+true
+
+Explanation:
+"ba" is a substring of s2,
+and "ba" is a permutation of "ab".
+
+
+Input:
+s1 = "ab"
+s2 = "eidboaoo"
+
+Output:
+false
+
+
+Input:
+s1 = "adc"
+s2 = "dcda"
+
+Output:
+true
+
+Explanation:
+"cda" is a permutation of "adc"
+
+--------------------------------------------------------
+INTUITION
+--------------------------------------------------------
+
+We need to check every substring of s2 of size s1.length().
+
+Because:
+A permutation of s1 must have:
+1) same length
+2) same character frequencies
+
+So instead of checking all substrings separately,
+we use SLIDING WINDOW of fixed size = s1.length().
+
+--------------------------------------------------------
+APPROACH 1: Sliding Window + full freq check
+--------------------------------------------------------
+
+Maintain freq[] for s1.
+
+For every window in s2:
+- subtract chars entering window
+- when window size becomes s1.size():
+    check if all freq values are 0
+
+If all freq become 0:
+=> current window is a permutation
+
+Time Complexity:
+O(26 * n) ≈ O(n)
+
+Space Complexity:
+O(26)
+
+--------------------------------------------------------
+APPROACH 2: Sliding Window + need counter (Better)
+--------------------------------------------------------
+
+freq[ch] = how many more of this char are still needed
+
+need = total characters still needed
+
+Rules:
+- When adding right char:
+    if freq[ch] > 0 => it was useful => need--
+    then freq[ch]--
+
+- When removing left char:
+    freq[ch]++
+    if freq[ch] > 0 => now this char is needed again => need++
+
+If window size == s1.length() and need == 0:
+=> valid permutation found
+
+This avoids checking all 26 chars every time.
+
+Time Complexity:
+O(n)
+
+Space Complexity:
+O(26)
+
+--------------------------------------------------------
+IMPORTANT OBSERVATION
+--------------------------------------------------------
+
+freq[ch] meaning:
+
+freq[ch] > 0  => still need this char
+freq[ch] == 0 => perfectly matched
+freq[ch] < 0  => extra char present in window
+
+--------------------------------------------------------
+WHY DUPLICATES MATTER
+--------------------------------------------------------
+
+Example:
+s1 = "aabc"
+
+Valid permutation must contain:
+a -> 2 times
+b -> 1 time
+c -> 1 time
+
+So using set/unordered_set is WRONG.
+We need FREQUENCY ARRAY.
+
+--------------------------------------------------------
+EDGE CASES
+--------------------------------------------------------
+
+1) s1.size() > s2.size()
+=> impossible => return false
+
+2) duplicate chars in s1
+=> must match exact count
+
+3) extra chars in window
+=> freq can go negative, that's okay
+
+--------------------------------------------------------
+OPTIMAL CODE IDEA
+--------------------------------------------------------
+
+Window size = s1.length()
+
+Expand right
+If char helps => need--
+
+When window size becomes valid:
+    if need == 0 => answer found
+
+Then remove left and slide forward
+
+--------------------------------------------------------
+DRY RUN
+--------------------------------------------------------
+
+s1 = "ab"
+s2 = "eidbaooo"
+
+freq initially:
+a=1, b=1
+
+need = 2
+
+Window process:
+"e"   -> extra char
+"ei"  -> extra chars
+"id"  -> no match
+"db"  -> b matched
+"ba"  -> a matched, need = 0
+
+Answer = true
+
+--------------------------------------------------------
+MOST COMMON MISTAKES
+--------------------------------------------------------
+
+1) Not keeping fixed window size
+2) Using set instead of frequency
+3) Wrong order while updating freq and need
+4) Comparing sorted substrings (works but slower)
+
+--------------------------------------------------------
+INTERVIEW ONE-LINER
+--------------------------------------------------------
+
+Use a fixed-size sliding window of length s1.length()
+and track character frequency difference.
+If all required chars are matched in any window,
+then s2 contains a permutation of s1.
+
+========================================================
+*/
+bool found(vector<int> &freq)
+{
+    for (int i = 0; i < 26; i++)
+    {
+        if (freq[i] != 0)
+            return false;
+    }
+    return true;
+}
+
+bool checkInclusion1(string s1, string s2)
+{
+    if (s1.size() > s2.size())
+        return false;
+
+    vector<int> freq(26);
+    for (char c : s1)
+    {
+        freq[c - 'a']++;
+    }
+
+    int start = 0;
+
+    for (int i = 0; i < s2.size(); i++)
+    {
+        freq[s2[i] - 'a']--; // include current char in window
+
+        int wsize = i - start + 1;
+
+        if (wsize < s1.size())
+            continue;
+
+        // check if all matched
+        if (found(freq))
+        {
+            cout << s2.substr(start, s1.size()) << endl;
+            return true;
+        }
+
+        // remove left char
+        freq[s2[start] - 'a']++;
+        start++;
+    }
+
+    return false;
+}
+
+/*
+APPROACH 2: Sliding Window + need counter (Optimal)
+
+Key Idea:
+- freq[ch] = how many more of this char we still need
+- need = total characters still needed
+
+When adding a char:
+- if it was needed → need--
+
+When removing a char:
+- if it becomes needed again → need++
+
+If need == 0 → valid permutation
+
+Time Complexity:
+- O(n)
+
+Space:
+- O(26)
+
+Handles:
+- duplicates
+- extra chars (negative freq)
+*/
+
+bool checkInclusion(string s1, string s2)
+{
+    if (s1.size() > s2.size())
+        return false;
+
+    vector<int> freq(26);
+    for (char c : s1)
+    {
+        freq[c - 'a']++;
+    }
+
+    int need = s1.size(); // total chars still required
+    int start = 0;
+
+    for (int i = 0; i < s2.size(); i++)
+    {
+
+        // include right char in window
+        if (freq[s2[i] - 'a'] > 0)
+        {
+            // this char was still needed
+            need--;
+        }
+        freq[s2[i] - 'a']--;
+
+        int wsize = i - start + 1;
+
+        if (wsize < s1.size())
+            continue;
+
+        // if all chars matched
+        if (need == 0)
+        {
+            cout << s2.substr(start, s1.size()) << endl;
+            return true;
+        }
+
+        // remove left char from window
+        freq[s2[start] - 'a']++;
+
+        if (freq[s2[start] - 'a'] > 0)
+        {
+            // removing a useful matched char
+            need++;
+        }
+
+        start++;
+    }
+
+    return false;
+}
+/*
+========================================================
+FIXED SIZE SLIDING WINDOW TEMPLATE
+========================================================
+
+Used when:
+- window size is fixed (k)
+- examples:
+  - permutation / anagram in string
+  - max sum subarray of size k
+  - first negative in every window
+  - count distinct in every window
+
+--------------------------------------------------------
+TEMPLATE
+--------------------------------------------------------
+
+
+int start = 0;
+for(int end = 0; end < n; end++) {
+
+    // 1) include s[end] in window
+    // update data structure
+
+    int wsize = end - start + 1;
+
+    // 2) if window not yet size k, continue expanding
+    if (wsize < k) continue;
+
+    // 3) now window size == k
+    // process / check answer here
+
+    // 4) remove s[start] before sliding
+    // update data structure
+
+    start++;
+}
+
+Ask 4 things:
+
+1) What does entering element do?
+2) What does leaving element do?
+3) When is window valid?
+4) What answer do I compute for each valid window?
+*/
+
+/*
+// !Problem: Min Window Substring
+Find the smallest substring of s that contains
+all characters of t (including duplicates).
+
+Example:
+s = "ADOBECODEBANC"
+t = "ABC"
+ans = "BANC"
+
+Idea:
+- Keep freq of chars needed from t.
+- Expand right pointer:
+    if current char was needed, reduce need.
+- When need == 0 => valid window found.
+- Now shrink from left as much as possible.
+- Update minimum valid window.
+
+Meaning of freq[ch]:
+
+        freq[ch] > 0  => still needed
+        freq[ch] == 0 => exactly satisfied
+        freq[ch] < 0  => extra in window
+
+TC: O(n+m)
+Each character is visited at most:
+once by r
+once by l
+So total = 2n + O(m) for creating freq array
+
+SC: O(k)   // k = unique chars in t
+*/
+
+/*
+APPROACH 1: Sliding Window + freq comparison
+
+Idea:
+- freq[ch] = required count of each char from s1
+- As window grows, we subtract chars from freq
+- If all freq become 0 → exact match (permutation found)
+
+Time Complexity:
+- O(26 * n) ≈ O(n)
+
+Space:
+- O(26)
+
+Example:
+s1 = "ab", s2 = "eidbaooo"
+Window "ba" → freq becomes all 0 → match
+*/
+
+string minWindow(string s, string t)
+{
+
+    int n = s.size();
+    int need = t.size();
+    unordered_map<char, int> m;
+    for (int i = 0; i < t.size(); i++)
+        m[t[i]]++;
+
+    int ws = -1;
+    int we = 0;
+    int win = INT_MAX;
+
+    int l = 0;
+    for (int i = 0; i < n; i++)
+    {
+
+        // expand window
+        if (m[s[i]] > 0)
+            need--; // if char found in map and freq 1,2,3,.. etc then need--
+        m[s[i]]--;
+
+        // at a point valid window would be found
+        // however it is possible ws is not at right place
+        // eg: dopeadobec and abc
+        // ws=0, window valid found when i is at end
+        // now ws needs to move till adobec to be minimum
+        while (need == 0)
+        {
+            // once a valid windwo found try shrinking it
+            if (i - l + 1 < win)
+            {
+                // better window found
+                win = i - l + 1;
+                ws = l;
+                we = i;
+            }
+
+            m[s[l]]++;
+            // if this is some unnecessary letter like dope its freq will stay <= 0
+            // as it was already m[s[i]]-- by i
+            if (m[s[l]] > 0)
+            {
+                // map says i have a char which is required
+                need++;
+            }
+            l++;
+        }
+    }
+
+    string res = ws == -1 ? "" : s.substr(ws, win);
+    return res;
+}
+
+/*
+// !LC 72 - Edit Distance
+
+Problem:
+Given two strings word1 and word2,
+return minimum operations needed to convert word1 -> word2.
+
+Allowed operations:
+1) Insert a character
+2) Delete a character
+3) Replace a character
+
+--------------------------------------------------
+Example:
+Input:
+word1 = "horse"
+word2 = "ros"
+
+Output:
+3
+
+Explanation:
+horse -> rorse   (replace h -> r)
+rorse -> rose    (delete r)
+rose  -> ros     (delete e)
+
+--------------------------------------------------
+Intuition:
+At every step compare current chars of both strings.
+
+State:
+solve(i, j) = minimum operations to convert
+word1[i....] -> word2[j....]
+
+Two cases:
+
+1) If chars already same:
+   No operation needed, move both pointers.
+
+2) If chars different:
+   Try all 3 operations and take minimum:
+
+   a) Delete word1[i]
+      -> move i only
+      -> 1 + solve(i+1, j)
+
+   b) Insert word2[j] into word1
+      -> current word1[i] still not matched
+      -> move j only
+      -> 1 + solve(i, j+1)
+
+   c) Replace word1[i] with word2[j]
+      -> both chars handled
+      -> move both
+      -> 1 + solve(i+1, j+1)
+
+--------------------------------------------------
+Base Cases:
+
+1) If word1 is fully used:
+   Need to insert all remaining chars of word2
+   cost = word2.size() - j
+
+2) If word2 is fully formed:
+   Need to delete all remaining chars of word1
+   cost = word1.size() - i
+
+--------------------------------------------------
+Memoization:
+dp[i][j] stores answer for state (i, j)
+to avoid recomputation.
+
+dp[i][j] = min operations for
+word1[i....] -> word2[j....]
+
+--------------------------------------------------
+Pseudo Code:
+
+solve(i, j):
+    if i == word1.size(): return word2.size() - j
+    if j == word2.size(): return word1.size() - i
+
+    if word1[i] == word2[j]:
+        return solve(i+1, j+1)
+
+    del = 1 + solve(i+1, j)
+    ins = 1 + solve(i, j+1)
+    rep = 1 + solve(i+1, j+1)
+
+    return min(del, ins, rep)
+
+Answer = solve(0, 0)
+
+--------------------------------------------------
+Time Complexity:
+O(m * n)
+
+Reason:
+There are only m*n states (i, j),
+and each state is solved once.
+
+--------------------------------------------------
+Space Complexity:
+O(m * n)   -> dp table
+O(m + n)   -> recursion stack
+
+Overall usually written as:
+O(m * n)
+
+--------------------------------------------------
+Key Idea Summary:
+Compare suffixes of both strings.
+If chars match -> move both.
+Else try delete / insert / replace and take minimum.
+*/
+int solve(int i, int j, string &s1, string &s2, vector<vector<int>> &dp)
+{
+    if (i == s1.size())
+    {
+        // s1 fully used, so s1->s2 insert all remaining s2 chars in s1
+        return s2.size() - j;
+    }
+    if (j == s2.size())
+    {
+        // s2 fully formed, remove remaining from s1
+        return s1.size() - i;
+    }
+
+    if (dp[i][j] != -1)
+        return dp[i][j];
+
+    if (s1[i] == s2[j]) // no operatin required
+        return dp[i][j] = solve(i + 1, j + 1, s1, s2, dp);
+
+    int del = 0;
+    int ins = 0;
+    int rep = 0;
+
+    // delete means removeing one from s1, then comparing next s1 char with
+    // curr s2 char
+    del = 1 + solve(i + 1, j, s1, s2, dp);
+
+    // insert means jth s2 char is inserted in s1, now compare
+    // next s2's char
+    ins = 1 + solve(i, j + 1, s1, s2, dp);
+
+    // rep means i have mathced s1's i and s2's j
+    rep = 1 + solve(i + 1, j + 1, s1, s2, dp);
+
+    return dp[i][j] = min({del, ins, rep});
+}
+int minDistance(string word1, string word2)
+{
+    int m = word1.size();
+    int n = word2.size();
+    vector<vector<int>> dp(m, vector<int>(n, -1));
+    return solve(0, 0, word1, word2, dp);
+}
+/*
+// !LC 572 - Subtree of Another Tree
+// ! solve using serialize and kmp string matching
+Idea:
+At every node of root:
+    check if subtree starting here is identical to subRoot
+
+Functions:
+1) same(a, b) -> check identical trees
+2) isSubtree -> try every node as starting point
+
+Return:
+same(root, subRoot) ||
+isSubtree(left) ||
+isSubtree(right)
+
+TC: O(n * m)
+SC: O(h)
+*/
+bool same(TreeNode *a, TreeNode *b)
+{
+    if (!a && !b)
+        return true;
+    if (!a || !b)
+        return false;
+    if (a->val != b->val)
+        return false;
+
+    return same(a->left, b->left) && same(a->right, b->right);
+}
+bool isSubtree(TreeNode *root, TreeNode *subRoot)
+{
+    if (!root)
+        return false;
+
+    if (same(root, subRoot))
+        return true;
+    else
+        return isSubtree(root->left, subRoot) ||
+               isSubtree(root->right, subRoot);
+};
+
+/*
+// !LC 57 - Insert Interval
+
+Idea:
+Intervals are already sorted and non-overlapping.
+
+Input: intervals = [[1,2],[3,5],[6,7],[8,10],[12,16]],
+        newInterval = [4,8]
+Output: [[1,2],[3,10],[12,16]]
+
+So process in 3 parts:
+1) Add all intervals before newInterval
+2) Merge all overlapping intervals into newInterval
+3) Add all remaining intervals
+
+Overlap condition:
+intervals[i][0] <= newend
+
+TC: O(n)
+SC: O(n)
+*/
+vector<vector<int>> insert(vector<vector<int>> &intervals, vector<int> &newInterval)
+{
+    vector<vector<int>> res;
+
+    // Current interval that may expand after merging overlaps
+    int newstart = newInterval[0];
+    int newend = newInterval[1];
+
+    int n = intervals.size();
+    int i = 0;
+
+    // 1) Add all intervals completely before newInterval
+    // No overlap if current interval ends before newInterval starts
+    while (i < n && intervals[i][1] < newstart)
+    {
+        res.push_back(intervals[i++]);
+    }
+
+    // 2) Merge all overlapping intervals with newInterval
+    // Overlap exists if current interval starts before/equal to newInterval end
+    while (i < n && intervals[i][0] <= newend)
+    {
+        newstart = min(newstart, intervals[i][0]);
+        newend = max(newend, intervals[i][1]);
+        i++;
+    }
+
+    // Push the final merged interval once
+    res.push_back({newstart, newend});
+
+    // 3) Add all remaining intervals (all lie after merged interval)
+    while (i < n)
+    {
+        res.push_back(intervals[i++]);
+    }
+
+    return res;
+}
+
+/*
+==================================================
+LC 55. Jump Game
+==================================================
+
+PROBLEM:
+Can we reach last index?
+
+Sample:
+nums = [2,3,1,1,4] -> true
+nums = [3,2,1,0,4] -> false
+
+INTUITION:
+At every index, track farthest position reachable so far.
+If current index > farthest, this index is unreachable.
+
+GREEDY:
+farthest = max(farthest, i + nums[i])
+
+TC: O(n)
+SC: O(1)
+
+--------------------------------------------------
+
+LC 45. Jump Game II
+==================================================
+
+PROBLEM:
+Find minimum jumps needed to reach last index.
+
+Sample:
+nums = [2,3,1,1,4] -> 2
+Explanation:
+0 -> 1 -> 4
+
+INTUITION:
+Think in BFS levels:
+current range = all indices reachable in current jump
+farthest = best reach for next jump
+
+When current range ends:
+=> must take one jump
+
+GREEDY:
+- expand farthest
+- when i == currEnd, take jump
+
+TC: O(n)
+SC: O(1)
+
+--------------------------------------------------
+
+KEY DIFFERENCE:
+Jump Game I  -> Can reach? (true/false)
+Jump Game II -> Min jumps needed
+
+Both are GREEDY optimal.
+*/
+
+bool canJump(vector<int> &nums)
+{
+    int farthest = 0;
+
+    for (int i = 0; i < nums.size(); i++)
+    {
+        if (i > farthest)
+            return false; // can't even reach this index
+        farthest = max(farthest, i + nums[i]);
+    }
+
+    return true;
+}
+bool canJump(vector<int> &nums)
+{
+    int n = nums.size();
+    if (n == 1)
+        return true;
+    int jumpsRem = nums[0];
+    int i = 1;
+    while (i < n && jumpsRem > 0)
+    {
+        jumpsRem--;
+        // cout << i << " " << jumpsRem << " " << nums[i] << endl;
+        jumpsRem = max(nums[i], jumpsRem);
+        i++;
+    }
+    return i == n;
+}
+
+int jump(vector<int> &nums)
+{
+    int jumps = 0, range = 0, farthest = 0;
+
+    for (int i = 0; i < nums.size() - 1; i++)
+    {
+        farthest = max(farthest, i + nums[i]);
+
+        if (i == range)
+        { // current jump range finished
+            jumps++;
+            range = farthest;
+        }
+    }
+
+    return jumps;
+}
+int jump(vector<int> &nums)
+{
+    int n = nums.size();
+    if (n == 1)
+        return 0;
+    int jump = 1;
+    int farthest = nums[0];
+    int range = nums[0];
+    for (int i = 1; i < n; i++)
+    {
+        if (range >= n - 1)
+            return jump;
+        if (i > range)
+        {
+            range = farthest;
+            jump++;
+        }
+        farthest = max(farthest, i + nums[i]);
+    }
+    return jump;
+}
+
+// Problem: 43. Multiply Strings
+// Input: num1 = "123", num2 = "45"
+// Output: "5535"
+
+// Intuition:
+// Do normal school multiplication digit by digit.
+// Product of num1[j] and num2[i] contributes to positions i+j and i+j+1 in result.
+
+// Pseudo:
+// 1. Create res array of size m+n filled with 0
+// 2. Traverse both strings from right to left
+// 3. Multiply digits and add to res[i+j+1]
+// 4. Put carry in res[i+j]
+// 5. Skip leading zeros and build final string
+
+// Mistakes:
+// Don't convert whole string to int/long long -> overflow
+// Don't forget res size should be m+n
+// Be careful with carry placement: ones at i+j+1, carry at i+j
+// Handle "0" case separately
+
+// TC: O(m*n)
+// SC: O(m+n)
+
+long long solve(string num)
+{
+    // "123" = 100 + 20 + 3
+    long long res = 0;
+    long long n = num.size();
+    long long multiplier = 1;
+    for (long long i = n - 1; i >= 0; i--)
+    {
+        char c = num[i];
+        res += ((c - '0') * multiplier);
+        multiplier *= 10;
+    }
+    return res;
+}
+string solve2(long long num)
+{
+    // 123 = "1" + "2" + "3"
+    if (num == 0)
+        return "0";
+    string res = "";
+    while (num)
+    {
+        long long d = num % 10;
+        num /= 10;
+        res.push_back((d + '0'));
+    }
+    reverse(res.begin(), res.end());
+    return res;
+}
+string multiply(string num1, string num2)
+{
+    if (num1 == "0" || num2 == "0")
+        return "0";
+    int m = num1.size();
+    int n = num2.size();
+    vector<int> res(m + n, 0);
+
+    //         j
+    //     4 9 2 num1
+    //       1 3 num2
+    //         i
+    //    --------
+    for (int i = n - 1; i >= 0; i--)
+    {
+        for (int j = m - 1; j >= 0; j--)
+        {
+            int a = num2[i] - '0';
+            int b = num1[j] - '0';
+            int prod = a * b;
+            // res[i+j+1] = ones place
+            // res[i+j]   = carry
+            res[i + j + 1] += (prod);
+            res[i + j] += res[i + j + 1] / 10;
+            res[i + j + 1] %= 10;
+        }
+    }
+    int i = 0;
+    while (res[i] == 0)
+        i++;
+    string prod = "";
+    while (i < res.size())
+    {
+        prod.push_back(res[i++] + '0');
+    }
+    return prod;
+}
+// Problem: 50. Pow(x, n)
+// Input: x = 2.0, n = 10
+// Output: 1024.0
+
+// Intuition:
+// Instead of multiplying x n times, use binary exponentiation.
+// If n is odd -> multiply answer by x
+// Every step: square x and halve n
+
+// Why it works:
+// x^13 = x * x^12
+//      = x * (x^2)^6
+// so each step reduces exponent fast
+
+// Handle negative power:
+// x^-n = 1 / x^n
+// Convert n to long long first to safely handle INT_MIN
+
+// Pseudo:
+// 1. If n < 0, make x = 1/x and n = -n
+// 2. While n > 0:
+//      if n is odd -> res *= x
+//      x = x * x
+//      n /= 2
+// 3. Return res
+
+// TC: O(log n)
+// SC: O(1)
+
+// Mistakes:
+// Don't do O(n) multiplication
+// Don't use abs(n) directly on int -> breaks for INT_MIN
+// Convert n to long long first
+double p(double x, long long n)
+{
+    if (n == 0)
+        return 1.0;
+    if (n % 2 == 0)
+        return p((x * x), n / 2);
+    else
+        return x * p((x * x), n / 2);
+}
+double myPow(double x, int n)
+{
+    if (n == 0 || x == 1)
+        return 1;
+
+    long long N = n;
+    if (N < 0)
+    {
+        x = 1 / x;
+        N = -N;
+    }
+    // double res = p(x, N);
+    double res = 1.0;
+    while (N)
+    {
+        if (N % 2 != 0)
+        {
+            // odd
+            res *= x;
+        }
+        x *= x;
+        N /= 2;
+    }
+    return res;
+}
 // ! ==========
 
 // !=============================================================================

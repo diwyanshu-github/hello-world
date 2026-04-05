@@ -77,7 +77,7 @@ void permutations1(vector<int> &temp, vector<int> &choices, int count, vector<bo
 //: Permutations with duplicates
 //  Analogy to Subsets:
 //  Idea is to Pick duplicates together, not skip–pick–skip.
-
+// duplicates must be picked in order (left → right)
 // If you use the first 2, and then the second 2, it’s valid. Example path: [1, 2, 2]
 // But if you skip the first 2 and use the second one instead, you’re treating them as different
 // you’ll get the same path [1, 2, 2] again from a different branch.
